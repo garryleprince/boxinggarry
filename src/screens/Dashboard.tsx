@@ -86,7 +86,7 @@ export function Dashboard() {
         </div>
 
         <div className="pill-row" style={{ marginTop: 'var(--s-3)' }}>
-          {workout.qualities.slice(0, 3).map((q) => (
+          {meta.qualities.map((q) => (
             <Pill key={q} color={QUALITY_COLOUR[q]}>
               {QUALITY_LABELS[q]}
             </Pill>

@@ -452,7 +452,7 @@ export const LEG_EXERCISES = defineAll([
     pattern: 'isometric',
     primary: ['abducteurs', 'fessiers'],
     secondary: ['obliques'],
-    qualities: ['stabilite', 'endurance-musculaire'],
+    qualities: ['stabilite', 'equilibre', 'endurance-musculaire'],
     intensity: 2,
     unilateral: true,
     measure: 'reps',

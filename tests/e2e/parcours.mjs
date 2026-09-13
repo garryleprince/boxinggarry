@@ -1,13 +1,31 @@
+/**
+ * Vérification navigateur de bout en bout.
+ *
+ * Complète les tests unitaires : ceux-ci couvrent les moteurs, celui-ci
+ * vérifie que le parcours réel fonctionne — création du coffre, onboarding,
+ * séance de 20 minutes, reprise après fermeture, fonctionnement hors
+ * connexion — dans un vrai navigateur en émulation iPhone.
+ *
+ * Prérequis :
+ *     npm run build
+ *     npx vite preview --port 4173 &
+ *     node tests/e2e/parcours.mjs
+ *
+ * Les captures d'écran sont écrites dans le dossier indiqué par SCRATCH, ou
+ * dans ./captures par défaut.
+ */
 
 import { chromium, devices } from 'playwright';
 
 const BASE = 'http://localhost:4173';
-const OUT = process.env.SCRATCH;
+const OUT = process.env.SCRATCH ?? './captures';
 const errors = [];
 let step = 100;
 const log = (m) => console.log(m);
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+// Use the bundled Chromium unless a path is given (some CI images ship one).
+const executablePath = process.env.CHROMIUM_PATH;
+const browser = await chromium.launch(executablePath ? { executablePath } : {});
 const context = await browser.newContext({ ...devices['iPhone 14 Pro'] });
 const page = await context.newPage();
 page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()));

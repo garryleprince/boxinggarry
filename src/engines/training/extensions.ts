@@ -349,8 +349,15 @@ export const EXTENSIONS: Record<ExtensionKey, ExtensionTemplate> = {
   },
 };
 
-/** Candidates when the extension should stay gentle, in preference order. */
-const GENTLE: readonly ExtensionKey[] = ['mobilite', 'core', 'shadowboxing'];
+/**
+ * Candidates after a demanding session: low joint cost, but still training.
+ * Pure mobility comes last here — the main session already ended with a
+ * cool-down, so offering more of it as the reward for wanting extra work is
+ * anticlimactic.
+ */
+const GENTLE: readonly ExtensionKey[] = ['core', 'shadowboxing', 'mobilite'];
+/** Candidates when the athlete is genuinely spent: mobility first. */
+const RECOVERING: readonly ExtensionKey[] = ['mobilite', 'shadowboxing', 'core'];
 /** Candidates when there is room to push. */
 const DEMANDING: readonly ExtensionKey[] = ['conditioning', 'full-body', 'finisher'];
 
@@ -365,16 +372,30 @@ const ALREADY_COVERED: Record<Archetype, readonly ExtensionKey[]> = {
   recovery: ['mobilite'],
 };
 
-/** Complementary fallbacks per archetype, used when nothing else fits. */
+/**
+ * What genuinely complements each archetype, in preference order.
+ *
+ * These are consulted first, so the offer differs by session instead of
+ * defaulting to the same module every day: after a full-body session the
+ * useful addition is skill and rhythm work, after a power session it is the
+ * trunk that has to transmit that power, after a strength session it is the
+ * metabolic side that tension work leaves untouched.
+ */
 const COMPLEMENT: Record<Archetype, readonly ExtensionKey[]> = {
-  'full-body-boxing': ['core', 'shadowboxing', 'mobilite'],
+  'full-body-boxing': ['shadowboxing', 'core', 'mobilite'],
   explosivite: ['core', 'mobilite', 'shadowboxing'],
   force: ['conditioning', 'shadowboxing', 'core'],
-  conditioning: ['core', 'mobilite', 'shadowboxing'],
-  'core-stabilite': ['conditioning', 'shadowboxing', 'explosivite'],
-  'hybride-boxe': ['core', 'mobilite', 'endurance'],
-  recovery: ['core', 'shadowboxing', 'endurance'],
+  conditioning: ['core', 'shadowboxing', 'mobilite'],
+  'core-stabilite': ['conditioning', 'explosivite', 'shadowboxing'],
+  'hybride-boxe': ['endurance', 'core', 'mobilite'],
+  recovery: ['shadowboxing', 'core', 'mobilite'],
 };
+
+/** Intensity ceiling for the module, given how the main session went. */
+function intensityCeiling(tired: boolean, preferGentle: boolean): number {
+  if (tired) return 1;
+  return preferGentle ? 3 : 5;
+}
 
 export interface ExtensionChoice {
   readonly template: ExtensionTemplate;
@@ -398,17 +419,25 @@ export function chooseExtension(
   // A recovery day stays a recovery day: the +10 never turns it into a hard
   // session, whatever the fatigue figures say (cahier des charges §35).
   const preferGentle = mainIntensity >= 4 || tired || mainArchetype === 'recovery';
+  const preferred = tired ? RECOVERING : preferGentle ? GENTLE : DEMANDING;
+  const ceiling = intensityCeiling(tired, preferGentle);
 
-  const ordered = [...(preferGentle ? GENTLE : DEMANDING), ...COMPLEMENT[mainArchetype]];
-  const pick = ordered.find((k) => !covered.has(k)) ?? COMPLEMENT[mainArchetype][0] ?? 'core';
+  // Archetype-specific complements first, then the intensity-appropriate list.
+  const ordered = [...COMPLEMENT[mainArchetype], ...preferred];
+  const pick =
+    ordered.find((k) => !covered.has(k) && EXTENSIONS[k].intensity <= ceiling) ??
+    ordered.find((k) => EXTENSIONS[k].intensity <= ceiling) ??
+    'mobilite';
   const template = EXTENSIONS[pick];
 
   const reason =
     mainArchetype === 'recovery'
       ? 'Journée de récupération : ces 10 minutes restent légères.'
-      : preferGentle
-        ? 'La séance a déjà été exigeante — ces 10 minutes complètent sans en rajouter sur les articulations.'
-        : 'La séance était abordable — ces 10 minutes vont chercher ce qu’elle n’a pas travaillé.';
+      : tired
+        ? 'Tes zones les plus sollicitées sont entamées — ces 10 minutes récupèrent au lieu d’en rajouter.'
+        : preferGentle
+          ? 'La séance a déjà été exigeante — ces 10 minutes complètent sans charger davantage les articulations.'
+          : 'La séance était abordable — ces 10 minutes vont chercher ce qu’elle n’a pas travaillé.';
 
   return { template, reason };
 }

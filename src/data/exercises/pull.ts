@@ -86,7 +86,7 @@ export const PULL_EXERCISES = defineAll([
     level: 3,
     pattern: 'pull',
     primary: ['dos', 'bras'],
-    secondary: ['epaules', 'abdominaux'],
+    secondary: ['epaules', 'abdominaux', 'avant-bras'],
     qualities: ['force', 'endurance-musculaire'],
     intensity: 3,
     equipment: ['barre-traction', 'chaise'],

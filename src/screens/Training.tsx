@@ -340,6 +340,8 @@ export function Training() {
             prescribed={logging.prescribed}
             exerciseName={getExercise(logging.phase.exerciseId).name}
             remaining={pendingReps.length - 1}
+            phaseLabel={phaseLabel(phase?.kind)}
+            phaseRemainingSec={snap.remainingSec}
             onSubmit={(value) => {
               recordPhase(logging.phase, value, false);
               setPendingReps((queue) => queue.slice(1));
@@ -388,16 +390,28 @@ function RepLogger({
   prescribed,
   exerciseName,
   remaining,
+  phaseLabel: currentPhase,
+  phaseRemainingSec,
   onSubmit,
 }: {
   prescribed: number;
   exerciseName: string;
   remaining: number;
+  phaseLabel: string;
+  phaseRemainingSec: number;
   onSubmit: (value: number) => void;
 }) {
   const [value, setValue] = useState(prescribed);
   return (
     <div className="stack">
+      {/* The sheet covers the timer, so the countdown has to come with it —
+          otherwise answering a question costs you sight of your own rest. */}
+      <div className="row-between">
+        <span className="eyebrow">{currentPhase}</span>
+        <span className="mono" style={{ fontWeight: 700 }}>
+          {formatDuration(phaseRemainingSec)}
+        </span>
+      </div>
       <p className="muted small">
         {exerciseName}
         {remaining > 0 ? (

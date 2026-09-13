@@ -77,7 +77,10 @@ export function SessionPreview() {
           </div>
         </div>
         <div className="pill-row">
-          {session.qualities.slice(0, 3).map((q) => (
+          {/* The main session is named by its archetype's purpose; an
+              extension has no archetype, so its own dominant qualities —
+              ordered by working time — describe it instead. */}
+          {(isExtension ? session.qualities.slice(0, 3) : meta.qualities).map((q) => (
             <Pill key={q} color={QUALITY_COLOUR[q]}>
               {QUALITY_LABELS[q]}
             </Pill>

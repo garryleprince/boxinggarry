@@ -513,12 +513,25 @@ export function generateWorkout(input: GenerateInput): Workout {
   const durationSec = computeDuration(blocks);
   if (durationSec > budget) throw new DurationBudgetError(durationSec, budget);
 
-  const qualities = new Set<Quality>();
+  // What the session *is* comes from its working blocks: the warm-up and the
+  // cool-down are infrastructure, and counting them made every session
+  // announce itself as mobility work. Each exercise's time is split across the
+  // qualities it trains, so listing three of them does not treble its weight.
+  const qualitySec = new Map<Quality, number>();
   for (const b of blocks) {
+    const counts = b.kind === 'principal' || b.kind === 'finisher' || b.kind === 'activation';
     for (const item of b.items) {
-      for (const q of getExercise(item.exerciseId).qualities) qualities.add(q);
+      const ex = getExercise(item.exerciseId);
+      if (ex.qualities.length === 0) continue;
+      const sec = (itemWorkSec(item) * b.rounds) / ex.qualities.length;
+      for (const q of ex.qualities) {
+        // Non-working blocks still contribute, but only marginally, so a
+        // recovery session is still described as mobility.
+        qualitySec.set(q, (qualitySec.get(q) ?? 0) + sec * (counts ? 1 : 0.15));
+      }
     }
   }
+  const qualities = [...qualitySec.entries()].sort((a, b) => b[1] - a[1]).map(([q]) => q);
 
   const draft: Workout = {
     id: workoutId(`${input.date}-${input.archetype}-${kind}-${input.variant ?? 0}`),
@@ -527,7 +540,7 @@ export function generateWorkout(input: GenerateInput): Workout {
     title: template.title,
     date: input.date,
     blocks,
-    qualities: [...qualities],
+    qualities,
     intensity: template.intensity,
     durationSec,
     budgetSec: budget,

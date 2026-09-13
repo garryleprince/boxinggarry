@@ -29,15 +29,27 @@ const HALF_LIFE_DAYS: Record<RecoveryRegion, number> = {
 };
 
 /**
- * Load units that take a region from fresh to fully fatigued. Calibrated so a
- * demanding 20-minute session focused on one region lands around 0.55–0.7.
+ * Load units that take a region from fresh to fully fatigued.
+ *
+ * Calibrated against measured session loads (see `tests/profils.test.ts`) so
+ * that a demanding 20-minute session focused on one region lands around 0.40 —
+ * roughly 70 % recovered the next morning — and a sustained five-sessions-a-week
+ * block settles near 0.55 rather than pinning the region at zero recovery,
+ * which would make the estimate useless precisely when it matters most.
  */
 const REGION_CAPACITY: Record<RecoveryRegion, number> = {
-  jambes: 900,
-  'haut-du-corps': 800,
-  core: 650,
-  cardio: 1100,
+  jambes: 1500,
+  'haut-du-corps': 1300,
+  core: 1100,
+  cardio: 1600,
 };
+
+/**
+ * Mobility work barely costs anything: joint circles and static holds are the
+ * remedy for fatigue, not a source of it. Counting them at full weight made a
+ * recovery day read as a training day.
+ */
+const MOBILITY_LOAD_FACTOR = 0.1;
 
 /** Rolling window used for muscle-balance debt, in days. */
 export const BALANCE_WINDOW_DAYS = 14;
@@ -76,7 +88,8 @@ export function computeWorkoutLoad(workout: Workout): {
         const ex = getExercise(item.exerciseId);
         const work = itemWorkSec(item);
         // Intensity 3 is the neutral reference, so the scale runs 0.33…1.67.
-        const unit = work * (ex.intensity / 3);
+        const unit =
+          work * (ex.intensity / 3) * (ex.pattern === 'mobility' ? MOBILITY_LOAD_FACTOR : 1);
 
         const share = (m: MuscleGroup, factor: number) => {
           muscles[m] = (muscles[m] ?? 0) + unit * factor;
@@ -88,7 +101,9 @@ export function computeWorkoutLoad(workout: Workout): {
         for (const m of ex.secondary) share(m, secondaryFactor);
 
         // Systemic cost: only intensity 3+ work meaningfully taxes the engine.
-        regions.cardio += work * Math.max(0, ex.intensity - 2) * 0.55;
+        if (ex.pattern !== 'mobility') {
+          regions.cardio += work * Math.max(0, ex.intensity - 2) * 0.55;
+        }
       }
     }
   }

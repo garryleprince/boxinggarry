@@ -32,7 +32,7 @@ Tout le reste sert cette boucle.
 | Chiffre tout sur l'appareil, sans serveur ni compte | `src/storage/`, `src/auth/` |
 | Fonctionne hors connexion, installable sur l'écran d'accueil | `src/pwa/`, `public/sw.js` |
 
-95 exercices, 10 échelles de progression, 7 archétypes de séance, 8 modules +10,
+99 exercices, 10 échelles de progression, 7 archétypes de séance, 8 modules +10,
 20 combinaisons de boxe, 4 presets de rounds.
 
 ---
@@ -42,7 +42,7 @@ Tout le reste sert cette boucle.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 74 tests
+npm test           # 95 tests
 npm run build      # dist/
 npm run preview    # sert dist/ localement
 ```
@@ -100,7 +100,7 @@ ne connaissent ni React ni IndexedDB, et seul `src/storage/` touche au disque.**
 de graphes, d'icônes, de composants, de dates ni de routage : chaque kilo-octet
 est téléchargé par l'athlète en 4G.
 
-Poids de l'application : **~152 Ko gzippés** (JS + CSS + HTML).
+Poids de l’application : **~161 Ko gzippés** (JS + CSS + HTML).
 
 ---
 
@@ -175,7 +175,7 @@ Les trois principales :
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — décisions techniques,
   moteur de génération, modèle de données, arbitrages
-- [`docs/AUDIT.md`](docs/AUDIT.md) — les 74 exigences du cahier des charges,
+- [`docs/AUDIT.md`](docs/AUDIT.md) — les exigences du cahier des charges,
   une par une, avec leur statut et ce qui les vérifie
 - [`docs/DEPLOIEMENT.md`](docs/DEPLOIEMENT.md) — mise en ligne et installation
   sur iPhone
@@ -192,3 +192,35 @@ de santé et ne détermine pas l'aptitude médicale à la pratique sportive. Les
 pourcentages de récupération sont des **estimations d'entraînement** calculées
 à partir du volume prescrit et du ressenti déclaré, jamais des mesures
 physiologiques. En cas de douleur, arrêter et consulter.
+
+---
+
+## Prochaines améliorations possibles
+
+Dans l'ordre où je les ferais, en expliquant pourquoi.
+
+1. **Valider sur un iPhone réel.** La vérification a été faite sur Chromium en
+   émulation iPhone. Le premier geste est d'installer depuis l'écran d'accueil,
+   lancer une séance, verrouiller l'écran une minute, revenir, et confirmer que
+   le chronomètre est au bon endroit. Rien d'autre ne devrait précéder cela.
+2. **Tests de rendu des composants.** Les moteurs sont couverts ; l'interface
+   ne l'est que par pilotage de navigateur. Un banc de tests de composants
+   attraperait les régressions visuelles sans relancer un navigateur.
+3. **Découper `app/store.ts`.** Environ 700 lignes, cohérentes mais concentrant
+   session, données et authentification. Trois tranches seraient plus lisibles.
+4. **Visuels photographiques ou vidéo.** Le champ `media` est déjà là : le
+   renseigner exercice par exercice remplace l'animation vectorielle sans
+   toucher au code de rendu. C'est le plus gros gain de qualité perçue par
+   unité d'effort.
+5. **Un vrai chapitre technique de boxe.** L'application entraîne le physique
+   du boxeur ; elle n'enseigne pas le geste. Un module de technique avec
+   décomposition serait un produit voisin, pas une extension de celui-ci.
+6. **Synchronisation multi-appareils**, si le besoin apparaît. L'architecture
+   est prête (documents indépendants, versionnés). Cela introduirait un
+   serveur, donc un coût et une surface d'attaque : à ne faire que pour un
+   besoin réel.
+7. **Apple Health.** Écrire les séances dans Santé demanderait une enveloppe
+   native ; à envisager seulement si le produit sort du cadre PWA.
+8. **Matériel additionnel.** L'architecture accepte déjà barre de traction,
+   élastiques, corde, médecine-ball et chaise. Enrichir la base pour chacun
+   élargirait le pool sans toucher au moteur.
