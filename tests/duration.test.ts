@@ -133,6 +133,22 @@ describe('budget de durée', () => {
     }
   });
 
+  it('chaque séance porte le budget contre lequel elle a été générée', () => {
+    const p = profile();
+    for (const archetype of ARCHETYPES) {
+      const w = generateWorkout({
+        profile: p,
+        progression: progressionFor(p),
+        recovery: freshRecovery(),
+        history: [],
+        date: DATES[0]!,
+        archetype,
+      });
+      expect(w.budgetSec, archetype).toBe(TEMPLATES[archetype].budgetSec);
+      expect(w.durationSec).toBeLessThanOrEqual(w.budgetSec);
+    }
+  });
+
   it('l’audit détaillé retrouve exactement le total', () => {
     const p = profile();
     const w = generateWorkout({

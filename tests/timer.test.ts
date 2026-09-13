@@ -179,6 +179,32 @@ describe('moteur de timer', () => {
     const snap = restored.tick();
     expect(snap.phase?.label).toBe('b');
     expect(Math.round(snap.remainingSec)).toBe(20);
+    expect(Math.round(snap.elapsedSec)).toBe(40);
+  });
+
+  it('ne consomme pas la séance pendant que l’application est fermée', () => {
+    const clock = fakeClock();
+    const spec = phases(['a', 60], ['b', 60], ['c', 60]);
+    const first = new TimerEngine(spec, { clock: clock.now });
+    first.start();
+    clock.advance(20_000);
+    first.tick();
+    const saved = first.serialise();
+
+    // The athlete closes the app and comes back a quarter of an hour later.
+    clock.advance(900_000);
+    const restored = new TimerEngine(spec, { clock: clock.now });
+    restored.restore(saved);
+    expect(restored.isRunning).toBe(false);
+    // Still on the first phase, with the time that was left when it was saved.
+    expect(Math.round(restored.snapshot().remainingSec)).toBe(40);
+    expect(restored.currentPhase?.label).toBe('a');
+
+    restored.resume();
+    clock.advance(10_000);
+    const snap = restored.tick();
+    expect(Math.round(snap.remainingSec)).toBe(30);
+    expect(Math.round(snap.elapsedSec)).toBe(30);
   });
 
   it('ne bloque pas sur une liste de phases vide', () => {
@@ -270,5 +296,31 @@ describe('round timer de boxe', () => {
     expect(t.isFinished).toBe(true);
     expect(order[0]).toBe('preparation');
     expect(order.filter((k) => k === 'travail')).toHaveLength(preset.rounds);
+  });
+});
+
+describe('fin de phase', () => {
+  it('distingue une phase terminée d’une phase passée, avec le temps réellement fait', () => {
+    const clock = fakeClock();
+    const t = new TimerEngine(phases(['a', 40], ['b', 40]), { clock: clock.now });
+    const ends: { label: string; reason: string; done: number }[] = [];
+    t.subscribe((e) => {
+      if (e.type === 'phase-end') {
+        ends.push({ label: e.phase.label, reason: e.reason, done: Math.round(e.completedSec) });
+      }
+    });
+    t.start();
+    // Phase A is cut short after 12 s.
+    clock.advance(12_000);
+    t.tick();
+    t.skip();
+    // Phase B runs its course.
+    clock.advance(60_000);
+    t.tick();
+
+    expect(ends).toEqual([
+      { label: 'a', reason: 'skip', done: 12 },
+      { label: 'b', reason: 'elapsed', done: 40 },
+    ]);
   });
 });

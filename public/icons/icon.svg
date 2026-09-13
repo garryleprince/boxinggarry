@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Boxing Body Coach">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16191f"/>
+      <stop offset="1" stop-color="#08090b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Boxing glove, drawn as an original mark: fist, thumb, cuff. -->
+  <g fill="none" stroke="#E8402A" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M168 176a60 60 0 0 1 120 0v34"/>
+    <path d="M288 166a52 52 0 0 1 104 0v112a108 108 0 0 1-108 108h-66a62 62 0 0 1-62-62V176"/>
+    <path d="M156 372h224"/>
+  </g>
+  <circle cx="352" cy="222" r="15" fill="#E8402A"/>
+</svg>

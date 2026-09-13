@@ -530,6 +530,7 @@ export function generateWorkout(input: GenerateInput): Workout {
     qualities: [...qualities],
     intensity: template.intensity,
     durationSec,
+    budgetSec: budget,
     load: { jambes: 0, 'haut-du-corps': 0, core: 0, cardio: 0 },
     rationale: buildRationale(input, blocks, worst),
     seed,

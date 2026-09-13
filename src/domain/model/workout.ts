@@ -132,6 +132,13 @@ export interface Workout {
   /** 1 (très léger) … 5 (très intense). Planned, not measured. */
   readonly intensity: 1 | 2 | 3 | 4 | 5;
   readonly durationSec: number;
+  /**
+   * The ceiling this session was generated against — 20:00 for a standard
+   * session, 10:00 for an extension, 15:00 for a recovery day. Carried here so
+   * the preview and the tests audit against the right figure rather than
+   * assuming one.
+   */
+  readonly budgetSec: number;
   /** Estimated training load per region, used by the recovery engine. */
   readonly load: Readonly<Record<RecoveryRegion, number>>;
   /** Human-readable reasons the engine chose this session today. */
@@ -200,6 +207,12 @@ export interface Performance {
   readonly at: DateKey;
   readonly totalVolume: number;
   readonly sessions: number;
+  /**
+   * Best result per session, oldest first, capped at the most recent entries.
+   * Keeping it here means the evolution chart never has to decrypt and scan
+   * every past session.
+   */
+  readonly history: readonly { readonly at: DateKey; readonly value: number }[];
 }
 
 /** One day of the plan: what is scheduled, and what actually happened. */

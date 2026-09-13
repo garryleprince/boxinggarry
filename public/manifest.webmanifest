@@ -1,0 +1,25 @@
+{
+  "name": "Boxing Body Coach",
+  "short_name": "Boxing Coach",
+  "description": "Coach de préparation physique au poids du corps pour la boxe. 20 minutes pour progresser.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
+  "categories": ["fitness", "health", "sports"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Séance du jour", "short_name": "Séance", "url": "/#/seance" },
+    { "name": "Round timer", "short_name": "Timer", "url": "/#/timer" },
+    { "name": "Shadowboxing", "short_name": "Shadow", "url": "/#/shadowboxing" }
+  ]
+}

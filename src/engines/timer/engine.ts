@@ -41,7 +41,19 @@ export interface TimerSnapshot {
 
 export type TimerEvent =
   | { type: 'phase-start'; phase: TimerPhase; index: number }
-  | { type: 'phase-end'; phase: TimerPhase; index: number }
+  /**
+   * `reason` distinguishes a phase that ran its course from one the athlete
+   * cut short, and `completedSec` says how much of it was actually done —
+   * without both, skipped work would be recorded as if it had been performed
+   * in full.
+   */
+  | {
+      type: 'phase-end';
+      phase: TimerPhase;
+      index: number;
+      reason: 'elapsed' | 'skip';
+      completedSec: number;
+    }
   | { type: 'tick'; snapshot: TimerSnapshot }
   | { type: 'countdown'; secondsLeft: number; phase: TimerPhase }
   | { type: 'paused' }
@@ -192,9 +204,12 @@ export class TimerEngine {
       // Banking the planned duration keeps elapsed time equal to the sum of
       // the phases played, so an overshoot while the tab was suspended does
       // not inflate the recorded session length.
-      this.completedSec +=
-        reason === 'skip' ? ending.durationSec - this.remainingSec() : ending.durationSec;
-      this.emit({ type: 'phase-end', phase: ending, index: this.index });
+      const done =
+        reason === 'skip'
+          ? Math.max(0, ending.durationSec - this.remainingSec())
+          : ending.durationSec;
+      this.completedSec += done;
+      this.emit({ type: 'phase-end', phase: ending, index: this.index, reason, completedSec: done });
     }
 
     this.index += 1;
@@ -267,26 +282,41 @@ export class TimerEngine {
     };
   }
 
-  /** Serialisable state, so a session survives an app reload mid-workout. */
+  /**
+   * Serialisable state, so a session survives an app reload mid-workout.
+   *
+   * The snapshot is always *paused*: it records the seconds left rather than
+   * the absolute deadline. Storing the deadline would mean that reopening the
+   * app twenty minutes later fast-forwards through the rest of the session, as
+   * though the athlete had been training the whole time.
+   */
   serialise(): TimerPersisted {
     return {
       index: this.index,
-      deadline: this.deadline,
-      frozenRemaining: this.frozenRemaining,
+      deadline: 0,
+      frozenRemaining: this.remainingSec(),
       started: this.started,
       done: this.done,
       completedSec: this.completedSec,
     };
   }
 
+  /** Reinstate a snapshot. The engine comes back paused; call `resume`. */
   restore(state: TimerPersisted): void {
-    this.index = Math.min(state.index, Math.max(0, this.phases.length - 1));
-    this.deadline = state.deadline;
-    this.frozenRemaining = state.frozenRemaining;
+    this.index = Math.min(Math.max(0, state.index), Math.max(0, this.phases.length - 1));
     this.started = state.started;
     this.done = state.done;
     this.completedSec = state.completedSec;
     this.countdownFired.clear();
+    if (state.frozenRemaining != null) {
+      this.frozenRemaining = state.frozenRemaining;
+      this.deadline = 0;
+    } else {
+      // A snapshot from an older build carried an absolute deadline; convert
+      // it to a paused remaining time rather than trusting a stale timestamp.
+      this.frozenRemaining = Math.max(0, (state.deadline - this.clock()) / 1000);
+      this.deadline = 0;
+    }
   }
 
   destroy(): void {
