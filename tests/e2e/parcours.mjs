@@ -197,6 +197,88 @@ try {
   await shot('seance-hors-connexion');
   await context.setOffline(false);
 
+  log('9. Balayage des ecrans');
+  await context.setOffline(false);
+  const screens = [
+    ['/', 'tableau de bord'],
+    ['/calendrier', 'calendrier'],
+    ['/seance', 'seance du jour'],
+    ['/bilan', 'bilan'],
+    ['/progression', 'progression'],
+    ['/historique', 'historique'],
+    ['/recuperation', 'recuperation'],
+    ['/objectifs', 'objectifs'],
+    ['/bibliotheque', 'bibliotheque'],
+    ['/boxe', 'boxe'],
+    ['/timer', 'round timer'],
+    ['/shadowboxing', 'shadowboxing'],
+    ['/parametres', 'parametres'],
+    ['/plus', 'plus'],
+  ];
+  for (const [path, label] of screens) {
+    await page.goto(BASE + '/#' + path);
+    await page.waitForTimeout(600);
+    await dismissHint();
+    const rendered = await page.evaluate(
+      () => (document.querySelector('.screen, .train')?.textContent ?? '').trim().length,
+    );
+    if (rendered < 20) errors.push(`Ecran vide: ${label} (${path})`);
+    log(`   ${label.padEnd(18)} ${rendered > 20 ? 'ok' : 'VIDE'}`);
+  }
+
+  log('10. Fiche exercice et detail du score');
+  await page.goto(BASE + '/#/bibliotheque');
+  await page.waitForTimeout(600);
+  await page.click('.card--tap');
+  await page.waitForSelector('.sheet');
+  const sheetText = (await page.locator('.sheet').textContent()) ?? '';
+  for (const expected of ['Consignes', 'Erreurs fréquentes', 'Respiration', 'Muscles']) {
+    if (!sheetText.includes(expected)) errors.push(`Fiche exercice sans « ${expected} »`);
+  }
+  log('   fiche exercice        ok');
+  await page.keyboard.press('Escape');
+
+  await page.goto(BASE + '/#/progression');
+  await page.waitForTimeout(700);
+  await dismissHint();
+  await page.click('.score-row');
+  await page.waitForSelector('.sheet');
+  const scoreText = (await page.locator('.sheet').textContent()) ?? '';
+  if (!scoreText.includes('Calculé à partir de')) {
+    errors.push('Le detail du score n explique pas son calcul');
+  }
+  log('   detail du score       ok');
+  await page.keyboard.press('Escape');
+
+  log('11. Theme clair');
+  await page.goto(BASE + '/#/parametres');
+  await page.waitForTimeout(600);
+  await dismissHint();
+  await page.click('.choice:has-text("Clair")');
+  await page.waitForTimeout(400);
+  const theme = await page.evaluate(() => document.documentElement.dataset['theme']);
+  log('   theme applique: ' + theme);
+  if (theme !== 'clair') errors.push('Le theme clair ne s applique pas');
+  await shot('theme-clair');
+  await page.click('.choice:has-text("Sombre")');
+  await page.waitForTimeout(300);
+
+  log('12. Tablette et bureau');
+  for (const [w, h, label] of [[834, 1112, 'tablette'], [1440, 900, 'bureau']]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+    const pg = await ctx.newPage();
+    await pg.goto(BASE, { waitUntil: 'networkidle' });
+    await pg.waitForTimeout(1200);
+    const overflow = await pg.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    );
+    if (overflow) errors.push(`Debordement horizontal en ${label}`);
+    step += 1;
+    await pg.screenshot({ path: OUT + '/shot-' + step + '-' + label + '.png' });
+    log(`   ${label.padEnd(18)} ${overflow ? 'DEBORDE' : 'ok'}`);
+    await ctx.close();
+  }
+
   log('');
   log('=== Erreurs ===');
   log(errors.length === 0 ? 'aucune' : errors.join('\n'));

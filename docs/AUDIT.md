@@ -6,8 +6,17 @@ Relecture intégrale, section par section. Statuts :
 - **Fait, avec réserve** — implémenté, avec une limite énoncée
 - **Écarté** — non implémenté, avec la raison et le comportement de secours
 
-Colonne « Vérifié par » : `test` = test automatisé, `navigateur` = pilotage
-Chromium en émulation iPhone 14 Pro, `revue` = relecture de code.
+Colonne « Vérifié par » : `test` = test automatisé (`npm test`, 95 tests),
+`navigateur` = script reproductible `npm run verify:browser` (Chromium en
+émulation iPhone 14 Pro, plus tablette et bureau), `revue` = relecture de code.
+
+Le script navigateur vérifie douze propriétés : création du coffre, onboarding,
+séance de 20 minutes exactement, minutage cohérent, déroulement complet,
+proposition du +10 après le bilan, reprise d'une séance interrompue au bon
+endroit du chronomètre, démarrage hors connexion, lancement d'une séance sans
+réseau, rendu des quatorze routes, contenu de la fiche exercice et du détail du
+score, thème clair, et absence de débordement horizontal en tablette et bureau.
+Il échoue avec un code non nul si l'une de ces propriétés est fausse.
 
 ---
 

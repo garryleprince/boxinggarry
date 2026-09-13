@@ -422,15 +422,23 @@
 
 /* ------------------------------------------------------------ divers */
 
+/*
+ * A block, not a flex row: banners carry prose with inline emphasis, and as a
+ * flex container every <strong> became its own column.
+ */
 .banner {
-  display: flex;
-  gap: var(--s-3);
+  display: block;
   padding: var(--s-3) var(--s-4);
   border-radius: var(--r-sm);
   background: var(--ink-2);
   border: 1px solid var(--line);
   font-size: var(--t-small);
+  line-height: 1.5;
   color: var(--text-2);
+}
+
+.banner strong {
+  color: var(--text-1);
 }
 
 .banner--warn {

@@ -465,6 +465,7 @@ function SessionComplete({
   const [busy, setBusy] = useState(false);
 
   const completed = performed.filter((p) => !p.skipped).length;
+  const skipped = performed.length - completed;
 
   return (
     <div className="train" data-kind="preparation">
@@ -474,7 +475,10 @@ function SessionComplete({
           <div className="mono" style={{ fontSize: '3rem', fontWeight: 700, letterSpacing: '-0.03em' }}>
             {formatDuration(elapsedSec)}
           </div>
-          <p className="muted small">{completed} exercices réalisés</p>
+          <p className="muted small">
+            {completed} exercice{completed === 1 ? '' : 's'} réalisé{completed === 1 ? '' : 's'}
+            {skipped > 0 ? ` · ${skipped} passé${skipped === 1 ? '' : 's'}` : ''}
+          </p>
         </div>
 
         <Card className="stack" style={{ width: '100%' }}>
