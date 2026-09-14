@@ -13,6 +13,11 @@ import type { AppSettings } from '@/domain/model/user';
  *  - `navigator.vibrate` does not exist in Safari on iOS — haptics are simply
  *    unavailable there, and `capabilities()` reports that honestly instead of
  *    the settings screen pretending otherwise;
+ *  - **iOS silences Web Audio when the ring/silent switch is on**, unlike
+ *    `<audio>` elements. Two measures move the app onto the media channel so
+ *    cues are heard with the ringer off: the AudioSession API where Safari
+ *    supports it, and a near-silent looping `<audio>` element as the fallback
+ *    on older iOS;
  *  - audio stops when iOS suspends the page (app backgrounded or screen
  *    locked). The timer stays accurate because it is timestamp-based, but no
  *    beep will sound while the app is not in the foreground. The screen wake
@@ -24,6 +29,53 @@ export interface AudioCapabilities {
   readonly speech: boolean;
   readonly vibration: boolean;
   readonly wakeLock: boolean;
+}
+
+/**
+ * A near-silent WAV, built at runtime rather than shipped as a file.
+ *
+ * Played on a loop during a session, it keeps the page on iOS's media audio
+ * channel, which is what stops the hardware silent switch from muting the Web
+ * Audio cues. Eight-bit PCM silence is 128, not 0.
+ */
+function silentWavDataUri(seconds = 0.5): string {
+  const rate = 8000;
+  const samples = Math.max(1, Math.floor(rate * seconds));
+  const buffer = new ArrayBuffer(44 + samples);
+  const view = new DataView(buffer);
+  const ascii = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+  ascii(0, 'RIFF');
+  view.setUint32(4, 36 + samples, true);
+  ascii(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true); // PCM header size
+  view.setUint16(20, 1, true); // format: PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate, true); // byte rate
+  view.setUint16(32, 1, true); // block align
+  view.setUint16(34, 8, true); // bits per sample
+  ascii(36, 'data');
+  view.setUint32(40, samples, true);
+  new Uint8Array(buffer, 44).fill(128);
+
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  return `data:audio/wav;base64,${btoa(binary)}`;
+}
+
+/** Ask iOS to treat this page as media playback rather than ambient sound. */
+function claimPlaybackSession(): void {
+  const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+  if (!session) return;
+  try {
+    // Safari's default is ambient, which the ringer switch mutes.
+    session.type = 'playback';
+  } catch {
+    /* older Safari: the silent element below is the fallback */
+  }
 }
 
 export function capabilities(): AudioCapabilities {
@@ -113,6 +165,10 @@ export class AudioCoach {
       await this.ctx?.resume().catch(() => undefined);
       return;
     }
+    // Must happen before the context exists, and inside the gesture.
+    claimPlaybackSession();
+    this.startKeepAlive();
+
     const Ctor = resolveContextCtor();
     if (!Ctor) return;
     try {
@@ -139,6 +195,27 @@ export class AudioCoach {
       } catch {
         /* speech unavailable — callouts degrade to beeps and on-screen text */
       }
+    }
+  }
+
+  /**
+   * Start the silent loop that keeps iOS on the media channel.
+   * Must be called from a user gesture, like everything else audio on iOS.
+   */
+  private startKeepAlive(): void {
+    if (this.keepAlive || typeof document === 'undefined') return;
+    try {
+      const el = document.createElement('audio');
+      el.src = silentWavDataUri();
+      el.loop = true;
+      // Not strictly zero: some iOS builds skip media they consider empty.
+      el.volume = 0.0001;
+      el.setAttribute('playsinline', '');
+      el.setAttribute('aria-hidden', 'true');
+      void el.play().catch(() => undefined);
+      this.keepAlive = el;
+    } catch {
+      /* the cues still play whenever the ringer is on */
     }
   }
 
@@ -241,6 +318,7 @@ export class AudioCoach {
     this.cancelSpeech();
     await this.releaseWakeLock();
     this.keepAlive?.pause();
+    if (this.keepAlive) this.keepAlive.src = '';
     this.keepAlive = null;
     try {
       await this.ctx?.close();
@@ -277,5 +355,10 @@ export function audioLimitations(): string[] {
   notes.push(
     'Les signaux sonores ne se déclenchent que si l’application est au premier plan et l’écran allumé : iOS suspend le JavaScript en arrière-plan. Le chronomètre reste juste et se resynchronise dès que tu reviens.',
   );
+  if (!('audioSession' in navigator)) {
+    notes.push(
+      'Sur iPhone, le bouton silencieux coupe le son des applications web. L’application demande à être traitée comme de la lecture média pour passer outre, mais si tu n’entends rien, vérifie ce bouton sur le côté du téléphone.',
+    );
+  }
   return notes;
 }

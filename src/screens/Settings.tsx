@@ -274,6 +274,37 @@ export function Settings() {
         </div>
       </section>
 
+      {/* ---------------------------------------------------- animations */}
+      <section style={{ marginBottom: 'var(--s-6)' }}>
+        <h3 className="section-title">Démonstrations des exercices</h3>
+        <div className="stack-sm">
+          {(
+            [
+              [
+                'systeme',
+                'Comme le système',
+                'Suit « Réduire les animations » dans les réglages d’iOS',
+              ],
+              ['toujours', 'Toujours animées', 'Même si tu réduis les animations ailleurs'],
+              ['jamais', 'Jamais animées', 'Position de départ et position finale superposées'],
+            ] as const
+          ).map(([value, label, sub]) => (
+            <Choice
+              key={value}
+              title={label}
+              sub={sub}
+              selected={core.settings.animations === value}
+              onSelect={() => void updateSettings({ animations: value })}
+            />
+          ))}
+        </div>
+        <p className="micro dim" style={{ marginTop: 'var(--s-3)' }}>
+          Si les mannequins ne bougent pas, c’est que « Réduire les animations » est actif dans
+          Réglages → Accessibilité → Mouvement. Choisis « Toujours animées » pour les garder ici
+          sans changer le réglage de ton iPhone.
+        </p>
+      </section>
+
       {/* ------------------------------------------------------- données */}
       <section style={{ marginBottom: 'var(--s-6)' }}>
         <h3 className="section-title">Données</h3>

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useRoute } from './router';
 import { useStore } from './store';
 import { TabBar } from '@/ui/TabBar';
+import { MotionProvider } from '@/ui/motion';
 import { Banner } from '@/ui/primitives';
 import { Splash } from '@/screens/Splash';
 import { LockScreen } from '@/screens/LockScreen';
@@ -31,6 +32,7 @@ export function App() {
   const status = useStore((s) => s.status);
   const boot = useStore((s) => s.boot);
   const theme = useStore((s) => s.core.settings.theme);
+  const animations = useStore((s) => s.core.settings.animations);
   const notice = useStore((s) => s.notice);
   const storageWarning = useStore((s) => s.storageWarning);
   const dismissNotice = useStore((s) => s.dismissNotice);
@@ -55,15 +57,25 @@ export function App() {
       ?.setAttribute('content', dark ? '#08090b' : '#f6f7f9');
   }, [theme]);
 
-  if (status === 'chargement') return <Splash />;
-  if (status === 'aucun-coffre') return <LockScreen mode="creation" />;
-  if (status === 'verrouille') return <LockScreen mode="verrouille" />;
-  if (status === 'onboarding') return <Onboarding />;
-  if (status === 'evaluation') return <Assessment />;
-
   const immersive = IMMERSIVE.includes(route.path);
 
+  const screen =
+    status === 'chargement' ? (
+      <Splash />
+    ) : status === 'aucun-coffre' ? (
+      <LockScreen mode="creation" />
+    ) : status === 'verrouille' ? (
+      <LockScreen mode="verrouille" />
+    ) : status === 'onboarding' ? (
+      <Onboarding />
+    ) : status === 'evaluation' ? (
+      <Assessment />
+    ) : null;
+
+  if (screen) return <MotionProvider setting={animations}>{screen}</MotionProvider>;
+
   return (
+    <MotionProvider setting={animations}>
     <div className="app">
       {!immersive && (notice || storageWarning) ? (
         <div style={{ padding: 'calc(var(--safe-top) + 8px) var(--s-4) 0' }}>
@@ -84,6 +96,7 @@ export function App() {
       {!immersive ? <TabBar /> : null}
       {!immersive ? <InstallHint /> : null}
     </div>
+    </MotionProvider>
   );
 }
 

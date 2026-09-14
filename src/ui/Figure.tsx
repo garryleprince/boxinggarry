@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BONES, POSES, samplePoseCycle, type Pose, type PoseKey } from '@/data/poses';
+import { useAnimationsEnabled } from './motion';
 
 /**
  * Animated exercise illustration.
@@ -45,19 +46,19 @@ export function Figure({
   label,
 }: FigureProps) {
   const keys = poses.length > 0 ? poses : (['stand'] as const);
+  const animationsEnabled = useAnimationsEnabled();
   const [pose, setPose] = useState<Pose>(() => POSES[keys[0]!] ?? POSES.stand);
   const frame = useRef(0);
 
+  // With motion off, the movement is still shown — as a ghost of the starting
+  // position behind the finishing one. Freezing on a single frame would remove
+  // the only thing the illustration is there to convey.
+  const frozen = still || !animationsEnabled;
+  const ghost = frozen && keys.length > 1 ? POSES[keys[0]!] : null;
+
   useEffect(() => {
-    if (still || keys.length < 2) {
-      setPose(POSES[keys[0]!] ?? POSES.stand);
-      return;
-    }
-    const reduce =
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) {
-      setPose(POSES[keys[0]!] ?? POSES.stand);
+    if (frozen || keys.length < 2) {
+      setPose(POSES[frozen && keys.length > 1 ? keys[keys.length - 1]! : keys[0]!] ?? POSES.stand);
       return;
     }
 
@@ -70,9 +71,10 @@ export function Figure({
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
     // `keys` is derived from props and stable per exercise.
-  }, [keys.join('|'), cycleSec, still]);
+  }, [keys.join('|'), cycleSec, frozen]);
 
   const bones = poseToPaths(pose);
+  const ghostBones = ghost ? poseToPaths(ghost) : [];
 
   return (
     <svg
@@ -94,6 +96,22 @@ export function Figure({
         strokeWidth="1.5"
         strokeLinecap="round"
       />
+      {ghostBones.map((b) => (
+        <line
+          key={`ghost-${b.key}`}
+          x1={b.x1}
+          y1={b.y1}
+          x2={b.x2}
+          y2={b.y2}
+          stroke="var(--text-3)"
+          strokeWidth={b.weight === 'core' ? 5 : 4}
+          strokeLinecap="round"
+          opacity={0.28}
+        />
+      ))}
+      {ghost ? (
+        <circle cx={ghost.head[0]} cy={ghost.head[1]} r="6.6" fill="var(--text-3)" opacity={0.28} />
+      ) : null}
       {bones.map((b) => (
         <line
           key={b.key}

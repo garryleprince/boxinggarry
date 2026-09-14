@@ -137,7 +137,15 @@ export interface AppSettings {
   readonly keepScreenAwake: boolean;
   readonly units: 'metric' | 'imperial';
   readonly theme: 'sombre' | 'clair' | 'systeme';
-  readonly reduceMotion: boolean;
+  /**
+   * Démonstrations animées des exercices.
+   *
+   * `systeme` suit « Réduire les animations » d'iOS. C'est le bon défaut, mais
+   * pas toujours le bon choix : sur une fiche d'exercice le mouvement *est*
+   * l'information, et quelqu'un qui réduit les animations à l'échelle du
+   * système peut vouloir les garder ici. D'où l'option explicite.
+   */
+  readonly animations: 'systeme' | 'toujours' | 'jamais';
   /** Ask before ending a session that still has work left. */
   readonly confirmQuit: boolean;
 }
@@ -150,7 +158,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   keepScreenAwake: true,
   units: 'metric',
   theme: 'sombre',
-  reduceMotion: false,
+  animations: 'systeme',
   confirmQuit: true,
 };
 

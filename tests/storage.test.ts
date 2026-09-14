@@ -268,3 +268,46 @@ describe('réinitialisation', () => {
     void dateKey;
   });
 });
+
+describe('migrations de schéma', () => {
+  it('convertit l’ancien booléen d’animations en réglage à trois états', async () => {
+    const { migrateCore, SCHEMA_VERSION } = await import('@/storage/schema');
+    const legacy = {
+      ...vault.emptyCore(),
+      schemaVersion: 1,
+      settings: { ...vault.emptyCore().settings, reduceMotion: true },
+    } as never;
+
+    const { doc, migrated, ahead } = migrateCore(legacy);
+    expect(migrated).toBe(true);
+    expect(ahead).toBe(false);
+    expect(doc.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(doc.settings.animations).toBe('jamais');
+    expect('reduceMotion' in doc.settings).toBe(false);
+  });
+
+  it('laisse les animations sur « systeme » quand rien n’était réduit', async () => {
+    const { migrateCore } = await import('@/storage/schema');
+    const legacy = {
+      ...vault.emptyCore(),
+      schemaVersion: 1,
+      settings: { ...vault.emptyCore().settings, reduceMotion: false },
+    } as never;
+    expect(migrateCore(legacy).doc.settings.animations).toBe('systeme');
+  });
+
+  it('refuse un document venu d’une version plus récente', async () => {
+    const { migrateCore } = await import('@/storage/schema');
+    const future = { ...vault.emptyCore(), schemaVersion: 99 };
+    const { ahead, migrated } = migrateCore(future);
+    expect(ahead).toBe(true);
+    expect(migrated).toBe(false);
+  });
+
+  it('un coffre de la version courante n’est pas migré inutilement', async () => {
+    const { migrateCore } = await import('@/storage/schema');
+    const { migrated, ahead } = migrateCore(vault.emptyCore());
+    expect(migrated).toBe(false);
+    expect(ahead).toBe(false);
+  });
+});

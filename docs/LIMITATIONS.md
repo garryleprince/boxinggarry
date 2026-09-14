@@ -37,7 +37,22 @@ garanti.
 **Conséquence pratique.** Pose le téléphone écran allumé, à portée de vue.
 C'est de toute façon ce qu'on fait pendant une séance.
 
-### 1.2 La vibration n'existe pas
+### 1.2 Le bouton silencieux coupe le son
+
+**Ce qui se passe.** iOS coupe le son des applications web quand l'interrupteur
+latéral est sur silencieux — et il le fait pour le Web Audio, qui sert à tous
+les signaux de l'application, alors qu'il épargne les éléments `<audio>`.
+
+**Ce qui est fait.**
+- L'application déclare une session audio de type `playback` (API AudioSession,
+  Safari 16.4 et plus), ce qui la place sur le canal média et lui fait ignorer
+  l'interrupteur.
+- En secours pour les iOS plus anciens, une piste silencieuse est jouée en
+  boucle pendant la séance, ce qui produit le même basculement de canal. Elle
+  est générée à l'exécution, sans fichier embarqué.
+- Si rien ne sort malgré tout, l'écran des paramètres dit de vérifier ce bouton.
+
+### 1.3 La vibration n'existe pas
 
 `navigator.vibrate` n'est pas implémenté dans Safari iOS, ni dans une
 application web installée. Les modes « vibration » et « son + vibration » sont
@@ -47,7 +62,7 @@ donc dégradés en son seul sur iPhone.
 paramètres l'annonce sur l'option concernée. Les modes restent proposés parce
 qu'ils fonctionnent sur Android et sur desktop.
 
-### 1.3 Le stockage peut être effacé
+### 1.4 Le stockage peut être effacé
 
 Une application **installée sur l'écran d'accueil** n'est pas soumise à
 l'effacement des données de site au bout de sept jours d'inactivité qui
@@ -64,7 +79,7 @@ de stockage ou après une très longue inactivité.
 **Conséquence pratique.** Utiliser l'application depuis l'écran d'accueil, pas
 depuis Safari, et exporter de temps en temps.
 
-### 1.4 Notifications : non implémentées
+### 1.5 Notifications : non implémentées
 
 Les notifications web fonctionnent sur iOS 16.4+ **pour une application
 installée sur l'écran d'accueil**, mais elles exigent un serveur de push
@@ -80,14 +95,14 @@ contraintes de coût nul et d'absence de serveur. La fonctionnalité est donc
 l'application Rappels ou une automatisation Raccourcis iOS qui ouvre l'URL de
 l'application à l'heure voulue.
 
-### 1.5 Orientation
+### 1.6 Orientation
 
 L'application est conçue en portrait. Le manifeste déclare
 `"orientation": "portrait"`, ce qu'iOS ignore pour les applications web
 installées : l'écran peut donc pivoter. La mise en page est fluide et reste
 utilisable en paysage, mais le portrait est ce qui a été travaillé.
 
-### 1.6 Synthèse vocale
+### 1.7 Synthèse vocale
 
 `SpeechSynthesis` fonctionne sur iOS mais exige un geste utilisateur pour la
 première émission, et la voix française dépend des voix installées sur
@@ -169,7 +184,20 @@ sous-score. Ce ne sont pas des normes scientifiques : ils servent à donner une
 
 ---
 
-## 4. Illustrations
+## 4. Accessibilité et animations
+
+Quand « Réduire les animations » est actif dans iOS, les démonstrations ne
+s'animent plus. Elles ne sont pas pour autant vidées de leur sens : la position
+de départ reste affichée en filigrane derrière la position finale, de sorte que
+le mouvement demeure lisible sans aucune animation.
+
+Un réglage explicite permet de passer outre dans les deux sens — « Toujours
+animées » pour garder les démonstrations malgré un réglage système global,
+« Jamais animées » pour les figer même sans préférence système.
+
+---
+
+## 5. Illustrations
 
 Les exercices sont illustrés par un squelette vectoriel à 13 articulations
 interpolé entre des poses. C'est original, animé, minuscule (~6 Ko pour
@@ -182,7 +210,7 @@ l'asset au lieu de l'animation vectorielle, sans toucher au code de rendu.
 
 ---
 
-## 5. Tests
+## 6. Tests
 
 Les 74 tests couvrent les parties critiques : budget de durée, cohérence du
 moteur, progression, récupération, planification, timer, stockage et

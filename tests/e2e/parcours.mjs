@@ -17,7 +17,7 @@
 
 import { chromium, devices } from 'playwright';
 
-const BASE = 'http://localhost:4173';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:4173';
 const OUT = process.env.SCRATCH ?? './captures';
 const errors = [];
 let step = 100;

@@ -11,7 +11,7 @@ import type {
 import type { TimerPersisted } from '@/engines/timer/engine';
 
 /** Bump whenever the persisted shape changes, and add a migration below. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * Lightweight record of a past session, held in the core document so the
@@ -80,7 +80,26 @@ export function migrateCore(doc: CoreDoc): { doc: CoreDoc; migrated: boolean; ah
   if (doc.schemaVersion > SCHEMA_VERSION) return { doc, migrated: false, ahead: true };
   if (doc.schemaVersion === SCHEMA_VERSION) return { doc, migrated: false, ahead: false };
 
-  // No migrations yet — version 1 is the first released shape. Future steps go
-  // here, each one taking the document from version N to N + 1.
-  return { doc: { ...doc, schemaVersion: SCHEMA_VERSION }, migrated: true, ahead: false };
+  let current = doc;
+
+  // 1 → 2 : le booléen `reduceMotion`, jamais lu par l'application, devient un
+  // réglage à trois états qui permet de forcer ou d'interdire les animations
+  // indépendamment de la préférence système.
+  if (current.schemaVersion < 2) {
+    const legacy = current.settings as { reduceMotion?: boolean };
+    const { reduceMotion, ...settings } = current.settings as AppSettings & {
+      reduceMotion?: boolean;
+    };
+    void reduceMotion;
+    current = {
+      ...current,
+      schemaVersion: 2,
+      settings: {
+        ...settings,
+        animations: legacy.reduceMotion === true ? 'jamais' : 'systeme',
+      },
+    };
+  }
+
+  return { doc: { ...current, schemaVersion: SCHEMA_VERSION }, migrated: true, ahead: false };
 }
