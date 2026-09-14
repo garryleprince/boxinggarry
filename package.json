@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Coach de préparation physique au poids du corps pour la boxe — PWA local-first",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
