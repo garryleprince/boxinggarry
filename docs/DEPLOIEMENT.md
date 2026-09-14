@@ -30,11 +30,31 @@ rien d'autre qu'un compte.
    - **Framework preset** : `Vite`
    - **Build command** : `npm run build`
    - **Build output directory** : `dist`
-   - **Node version** : variable d'environnement `NODE_VERSION` = `22`
-4. **Save and Deploy**.
+   - **Node version** : rien à faire, `.node-version` s'en charge
+4. **Production branch** : la branche qui contient réellement le projet.
+   C'est le piège le plus courant — Cloudflare construit la branche **par
+   défaut du dépôt**, pas celle sélectionnée à la création. Si le projet vit
+   sur une branche de travail, il faut la désigner ici, sinon le build échoue
+   sur `Could not read package.json` : le clone a bien réussi, mais la branche
+   construite ne contient pas le projet.
+5. **Save and Deploy**.
 
 L'application est en ligne sur `https://<projet>.pages.dev`, en HTTPS, servie
 depuis le réseau Cloudflare.
+
+### Si le build échoue sur `Could not read package.json`
+
+Le clone a réussi mais la branche construite ne contient pas `package.json`.
+Deux corrections possibles :
+
+- **Settings → Builds & deployments → Production branch** : désigner la bonne
+  branche, puis **Retry deployment** ;
+- ou fusionner la branche de travail dans la branche par défaut du dépôt, ce
+  qui rend la configuration par défaut correcte.
+
+La version de Node est fixée par `.node-version` (22) et par le champ
+`engines` de `package.json` : il n'y a pas besoin de définir `NODE_VERSION` à
+la main.
 
 ### Depuis la machine locale
 

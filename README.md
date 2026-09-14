@@ -131,7 +131,10 @@ Version courte, Cloudflare Pages :
 1. Pousser ce dépôt sur GitHub.
 2. Cloudflare Dashboard → Workers & Pages → Create → Pages → Connect to Git.
 3. Build command `npm run build`, output directory `dist`.
-4. Déployer. L'URL `https://<projet>.pages.dev` est en HTTPS, gratuite et
+4. **Production branch : la branche qui contient le projet.** Cloudflare
+   construit la branche par défaut du dépôt, pas celle choisie à la création ;
+   c'est la cause habituelle d'un échec sur `Could not read package.json`.
+5. Déployer. L'URL `https://<projet>.pages.dev` est en HTTPS, gratuite et
    illimitée en bande passante statique.
 
 ---
