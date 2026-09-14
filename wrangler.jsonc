@@ -1,0 +1,18 @@
+{
+  // Déploiement Cloudflare Workers avec actifs statiques.
+  //
+  // L'application est entièrement statique : il n'y a aucun code Worker, juste
+  // le contenu de `dist/` servi depuis le réseau Cloudflare. Le fichier
+  // `public/_headers` (recopié dans `dist/` par Vite) porte la CSP et la
+  // politique de cache ; Workers l'applique aux réponses d'actifs statiques.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "boxing-body-coach",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    // Le routage se fait par hash (`#/seance`), donc seule `/` est demandée au
+    // serveur. Servir l'application sur les chemins inconnus évite malgré tout
+    // qu'un lien mal recopié tombe sur un 404.
+    "not_found_handling": "single-page-application"
+  }
+}

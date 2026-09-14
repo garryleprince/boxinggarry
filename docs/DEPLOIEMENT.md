@@ -56,14 +56,43 @@ La version de Node est fixée par `.node-version` (22) et par le champ
 `engines` de `package.json` : il n'y a pas besoin de définir `NODE_VERSION` à
 la main.
 
+### Si l'interface demande un « Deploy command »
+
+Cloudflare a deux flux pour un site statique, et l'interface ne dit pas
+toujours lequel est actif. Le champ **Deploy command** n'existe que dans le
+flux **Workers Builds**, le plus récent :
+
+| Champ | Valeur |
+| --- | --- |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Production branch | `main` |
+
+Ce flux lit `wrangler.jsonc` à la racine du dépôt, qui déclare `dist/` comme
+répertoire d'actifs. Il n'y a **aucun code Worker** : l'application est servie
+telle quelle depuis le réseau Cloudflare.
+
+Le flux **Pages** classique, lui, ne demande pas de commande de déploiement,
+seulement un répertoire de sortie (`dist`). Les deux fonctionnent ; celui qui
+s'affiche dépend de l'ancienneté du compte et du point d'entrée choisi.
+
 ### Depuis la machine locale
 
 ```bash
 npm run build
+npx wrangler deploy              # flux Workers, lit wrangler.jsonc
+# ou, pour un projet Pages existant :
 npx wrangler pages deploy dist --project-name=boxing-body-coach
 ```
 
 `wrangler` demande une authentification au premier lancement.
+
+### Les en-têtes de sécurité
+
+`public/_headers` est recopié dans `dist/` par Vite, et Workers Static Assets
+comme Pages l'appliquent aux réponses d'actifs statiques : la CSP, le
+`no-cache` sur `sw.js` et le cache immuable sur `assets/` sont donc actifs dans
+les deux flux, sans configuration supplémentaire.
 
 ### En-têtes recommandés
 
