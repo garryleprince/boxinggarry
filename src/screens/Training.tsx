@@ -261,7 +261,7 @@ export function Training() {
             <Figure
               poses={exercise.poses}
               size="100%"
-              cycleSec={2.2}
+              cycleSec={exercise.secondsPerRep}
               still={phase?.kind !== 'travail'}
               label={exercise.name}
             />

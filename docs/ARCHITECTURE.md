@@ -292,15 +292,102 @@ d'entraînement.
 
 ## 7. Illustrations
 
-Un squelette de 13 articulations, défini par des coordonnées dans un
-`viewBox` de 100 × 100, interpolé entre deux ou trois poses et rendu en SVG
-inline. Environ soixante poses couvrent toute la base d'exercices, pour ~6 Ko.
+Un squelette de 13 articulations dessiné dans un `viewBox` de 100 × 100, animé
+d'une pose à l'autre et rendu en SVG inline. Quatre-vingt-neuf poses couvrent
+toute la base d'exercices, pour quelques kilo-octets.
 
 Pourquoi pas des images ou des GIF : le poids sur réseau mobile, la
 disponibilité hors connexion dès la première ouverture, et surtout les droits —
 aucune illustration sous copyright n'est utilisée. Un champ `media` par
 exercice permet de basculer vers une photo, un GIF ou une vidéo sans toucher
 au code de rendu (§25).
+
+### Le dessin dit le mouvement, le squelette dit le corps
+
+Les poses sont écrites à la main, comme treize paires de coordonnées. C'est
+rapide à écrire et ça décrit bien l'intention — mais ça ne décrit aucun corps :
+rien n'empêche le même avant-bras de mesurer 4 unités dans un dessin et 16 dans
+un autre, ni un bonhomme d'avoir une cuisse plus longue que l'autre.
+
+Les coordonnées sont donc traitées comme l'**intention** : elles fixent l'angle
+de chaque articulation, et un mouvement n'est rien d'autre que cela. Le corps,
+lui, est reconstruit par-dessus sur un jeu unique d'os aux proportions
+anatomiques usuelles (rapports de Drillis & Contini, mis à l'échelle pour que
+la pose la plus étendue — bras tendus au-dessus de la tête — tienne dans le
+cadre). Le mouvement traverse intact ; le corps cesse de changer de forme d'un
+exercice à l'autre.
+
+Conséquence assumée : le bonhomme debout est environ un dixième plus petit
+qu'avant, parce que ses bras ont désormais la bonne longueur et que sa portée
+bras levés doit tenir dans le même cadre.
+
+### Poser la figure au sol
+
+Le sol est à `y = 96`. Les points d'appui sont lus sur le dessin — ce qui touche
+le point le plus bas touche le sol, avec une bande plus large pour les mains et
+les pieds quand ce sont eux qui portent — puis la figure est descendue jusqu'à
+ce que ses appuis s'équilibrent sur le sol, et chaque membre porteur va
+chercher lui-même l'unité ou deux qui restent (cinématique inverse à deux os,
+en gardant le sens de flexion du dessin).
+
+Deux pièges, tous deux rencontrés et tous deux couverts par des tests :
+
+- La hauteur doit venir de **où le dessin a mis les mains et les pieds**, jamais
+  de la portée maximale des membres. Placer les appuis à bout de bras tend tous
+  les membres porteurs : le bas d'une pompe ressort coudes verrouillés, donc
+  identique au haut, et la répétition disparaît.
+- Certaines poses ne touchent pas le sol du tout, et les replaquer supprime le
+  mouvement. Les sauts, la traction — ancrée par les mains sur une barre fixe,
+  pour que ce soit le corps qui monte — et le relevé de mollets, dont tout le
+  mouvement est justement de décoller, sont ancrés en hauteur (`ANCHORS`).
+
+### Cadencer
+
+Une répétition n'est pas une interpolation linéaire en boucle. Trois choses
+séparent un schéma qui tressaute d'un coach qui montre :
+
+- **La boucle est fermée.** La dernière image *est* la première, donc la figure
+  ne se téléporte pas au départ à chaque tour. Une séquence qui repasse par une
+  même pose (gainage → touche → gainage → touche) boucle telle quelle ; les
+  autres font l'aller-retour.
+- **Le temps suit la distance parcourue.** Passer par une position
+  intermédiaire ne coûte plus autant qu'une descente complète.
+- **Les fins de course sont tenues**, et la figure y entre et en sort avec une
+  vitesse *et* une accélération nulles. Sans pause, le mouvement se lit comme un
+  tremblement plutôt que comme des répétitions comptables.
+
+La descente est plus lente que la remontée : le sens est déduit de la hauteur
+du tronc, pas de l'ordre d'écriture des poses, parce que la bibliothèque écrit
+tantôt le haut d'abord, tantôt le bas. Et la durée d'une répétition est celle
+que l'exercice prescrit (`secondsPerRep`), bornée à une plage regardable : un
+Nordic curl à 6 s se voit lentement, une montée de genoux à 1,4 s vivement.
+
+### Interpoler des angles, pas des points
+
+Interpoler les positions des articulations raccourcit les os en cours de route —
+mesuré jusqu'à 99 % sur un avant-bras au milieu d'un squat. Les poses sont donc
+interpolées en **angles articulaires relatifs au parent** (un coude mesuré
+contre son propre bras est un angle de flexion, et interpoler une flexion est
+la façon dont un vrai bras bouge), puis reconstruites. Les os gardent leur
+longueur au millionième près à chaque image.
+
+### Ce que ça coûte
+
+Normaliser un dessin prend une fraction de milliseconde, et c'est fait à la
+première utilisation, pas à l'import : une séance qui montre six exercices paie
+six dessins, pas quatre-vingt-neuf. L'animation est écrite directement dans les
+attributs SVG sur une seule boucle `requestAnimationFrame` partagée — pas de
+rendu React soixante fois par seconde, ce qui sur téléphone fait la différence
+entre une démonstration et un à-coup.
+
+### Vérification
+
+`tests/poses.test.ts` mesure ce qui était cassé : os de longueur constante dans
+toute la bibliothèque, côtés gauche et droit identiques, appuis réellement au
+sol, poses dans le cadre, boucle sans rupture, os rigides pendant tout le
+mouvement, temps d'arrêt en fin de course, descente plus lente que la remontée,
+et aucune séquence aplatie par la mise au sol. `npm run figures` écrit une
+planche contact SVG pour regarder le résultat — un test ne remplace pas l'œil.
 
 ---
 

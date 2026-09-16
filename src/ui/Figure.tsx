@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { BONES, POSES, samplePoseCycle, type Pose, type PoseKey } from '@/data/poses';
 import { useAnimationsEnabled } from './motion';
 
@@ -10,15 +10,48 @@ import { useAnimationsEnabled } from './motion';
  * position — rather than a frozen shape. Everything is inline SVG: no
  * requests, no copyright, works offline from the first launch.
  *
+ * The figure is moved by writing straight to the SVG attributes on one shared
+ * animation frame, not by re-rendering React sixty times a second. On a phone
+ * that is the difference between a demonstration and a stutter, and it lets
+ * several figures on one screen share a single timer.
+ *
  * When an exercise carries a `media` asset, callers render that instead; this
  * component is the default and the fallback.
  */
 
+type Tick = (now: number) => void;
+
+const subscribers = new Set<Tick>();
+let frame = 0;
+
+function pump(now: number) {
+  frame = requestAnimationFrame(pump);
+  for (const tick of subscribers) tick(now);
+}
+
+/** One timer for every figure on screen; it stops when the last one unmounts. */
+function subscribe(tick: Tick): () => void {
+  subscribers.add(tick);
+  if (!frame) frame = requestAnimationFrame(pump);
+  return () => {
+    subscribers.delete(tick);
+    if (subscribers.size === 0 && frame) {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+  };
+}
+
+/** Sensible bounds for a demonstration, whatever tempo the exercise prescribes. */
+const MIN_CYCLE = 1.3;
+const MAX_CYCLE = 4.5;
+const DEFAULT_CYCLE = 2.6;
+
 export interface FigureProps {
   poses: readonly PoseKey[];
-  /** Seconds for one complete out-and-back cycle. */
+  /** Seconds for one complete repetition. Clamped to a watchable range. */
   cycleSec?: number;
-  /** Freeze on the first pose — for reduced motion or list thumbnails. */
+  /** Freeze on the movement's end position — for reduced motion or thumbnails. */
   still?: boolean;
   size?: number | string;
   className?: string;
@@ -26,59 +59,62 @@ export interface FigureProps {
   label?: string;
 }
 
-function poseToPaths(pose: Pose) {
-  return BONES.map(([a, b, weight], i) => ({
-    key: `${String(a)}-${String(b)}-${i}`,
-    x1: pose[a][0],
-    y1: pose[a][1],
-    x2: pose[b][0],
-    y2: pose[b][1],
-    weight,
-  }));
-}
+const HEAD_RADIUS = 6.6;
 
 export function Figure({
   poses,
-  cycleSec = 2.4,
+  cycleSec = DEFAULT_CYCLE,
   still = false,
   size = '100%',
   className,
   label,
 }: FigureProps) {
-  const keys = poses.length > 0 ? poses : (['stand'] as const);
+  const id = poses.join('|');
+  const keys = useMemo(
+    () => (poses.length > 0 ? poses : (['stand'] as const)),
+    // The sequence is fixed per exercise; its identity is the joined key.
+    [id],
+  );
   const animationsEnabled = useAnimationsEnabled();
-  const [pose, setPose] = useState<Pose>(() => POSES[keys[0]!] ?? POSES.stand);
-  const frame = useRef(0);
 
   // With motion off, the movement is still shown — as a ghost of the starting
   // position behind the finishing one. Freezing on a single frame would remove
   // the only thing the illustration is there to convey.
   const frozen = still || !animationsEnabled;
   const ghost = frozen && keys.length > 1 ? POSES[keys[0]!] : null;
+  const shown = POSES[frozen ? keys[keys.length - 1]! : keys[0]!] ?? POSES.stand;
+
+  const lines = useRef<(SVGLineElement | null)[]>([]);
+  const head = useRef<SVGCircleElement | null>(null);
 
   useEffect(() => {
-    if (frozen || keys.length < 2) {
-      setPose(POSES[frozen && keys.length > 1 ? keys[keys.length - 1]! : keys[0]!] ?? POSES.stand);
-      return;
-    }
-
+    if (frozen || keys.length < 2) return;
+    const period = Math.min(MAX_CYCLE, Math.max(MIN_CYCLE, cycleSec));
     const start = performance.now();
-    const tick = (now: number) => {
-      const phase = ((now - start) / 1000 / cycleSec) % 1;
-      setPose(samplePoseCycle(keys, phase));
-      frame.current = requestAnimationFrame(tick);
-    };
-    frame.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame.current);
-    // `keys` is derived from props and stable per exercise.
-  }, [keys.join('|'), cycleSec, frozen]);
 
-  const bones = poseToPaths(pose);
-  const ghostBones = ghost ? poseToPaths(ghost) : [];
+    const draw = (pose: Pose) => {
+      BONES.forEach(([a, b], i) => {
+        const el = lines.current[i];
+        if (!el) return;
+        el.setAttribute('x1', pose[a][0].toFixed(2));
+        el.setAttribute('y1', pose[a][1].toFixed(2));
+        el.setAttribute('x2', pose[b][0].toFixed(2));
+        el.setAttribute('y2', pose[b][1].toFixed(2));
+      });
+      if (head.current) {
+        head.current.setAttribute('cx', pose.head[0].toFixed(2));
+        head.current.setAttribute('cy', pose.head[1].toFixed(2));
+      }
+    };
+
+    const stop = subscribe((now) => draw(samplePoseCycle(keys, ((now - start) / 1000 / period) % 1)));
+    draw(samplePoseCycle(keys, 0));
+    return stop;
+  }, [keys, cycleSec, frozen]);
 
   return (
     <svg
-      viewBox="0 0 100 104"
+      viewBox="0 0 100 100"
       width={size}
       height={size}
       className={className}
@@ -96,39 +132,51 @@ export function Figure({
         strokeWidth="1.5"
         strokeLinecap="round"
       />
-      {ghostBones.map((b) => (
-        <line
-          key={`ghost-${b.key}`}
-          x1={b.x1}
-          y1={b.y1}
-          x2={b.x2}
-          y2={b.y2}
-          stroke="var(--text-3)"
-          strokeWidth={b.weight === 'core' ? 5 : 4}
-          strokeLinecap="round"
+      {ghost
+        ? BONES.map(([a, b, weight], i) => (
+            <line
+              key={`ghost-${i}`}
+              x1={ghost[a][0]}
+              y1={ghost[a][1]}
+              x2={ghost[b][0]}
+              y2={ghost[b][1]}
+              stroke="var(--text-3)"
+              strokeWidth={weight === 'core' ? 5 : 4}
+              strokeLinecap="round"
+              opacity={0.28}
+            />
+          ))
+        : null}
+      {ghost ? (
+        <circle
+          cx={ghost.head[0]}
+          cy={ghost.head[1]}
+          r={HEAD_RADIUS}
+          fill="var(--text-3)"
           opacity={0.28}
         />
-      ))}
-      {ghost ? (
-        <circle cx={ghost.head[0]} cy={ghost.head[1]} r="6.6" fill="var(--text-3)" opacity={0.28} />
       ) : null}
-      {bones.map((b) => (
+      {BONES.map(([a, b, weight], i) => (
         <line
-          key={b.key}
-          x1={b.x1}
-          y1={b.y1}
-          x2={b.x2}
-          y2={b.y2}
-          stroke={b.weight === 'far' ? 'var(--text-3)' : 'var(--text-1)'}
-          strokeWidth={b.weight === 'core' ? 5 : b.weight === 'near' ? 4.2 : 3.4}
+          key={i}
+          ref={(el) => {
+            lines.current[i] = el;
+          }}
+          x1={shown[a][0]}
+          y1={shown[a][1]}
+          x2={shown[b][0]}
+          y2={shown[b][1]}
+          stroke={weight === 'far' ? 'var(--text-3)' : 'var(--text-1)'}
+          strokeWidth={weight === 'core' ? 5 : weight === 'near' ? 4.2 : 3.4}
           strokeLinecap="round"
-          opacity={b.weight === 'far' ? 0.55 : 1}
+          opacity={weight === 'far' ? 0.55 : 1}
         />
       ))}
       <circle
-        cx={pose.head[0]}
-        cy={pose.head[1]}
-        r="6.6"
+        ref={head}
+        cx={shown.head[0]}
+        cy={shown.head[1]}
+        r={HEAD_RADIUS}
         fill="var(--signal)"
         stroke="var(--ink-0)"
         strokeWidth="1.2"

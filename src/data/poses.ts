@@ -1,65 +1,40 @@
 /**
  * Vector pose library.
  *
- * Every exercise is illustrated by interpolating between two or three poses of
- * a 13-joint skeleton drawn in a 0–100 viewBox with the ground at y = 96. This
+ * Every exercise is illustrated by walking a 13-joint skeleton through a short
+ * sequence of poses drawn in a 0–100 viewBox with the floor at y = 96. This
  * keeps the whole illustration set at a few kilobytes, works offline, animates
  * the movement rather than freezing it, and owes nothing to any third-party
  * artwork.
+ *
+ * The coordinates below are the *drawing*: they fix what each joint is doing.
+ * `skeleton.ts` then rebuilds every one of them over a single set of
+ * anatomically-proportioned bones and plants it on the floor, so the same
+ * movement is shown by the same body in every exercise. Editing a pose here
+ * means editing the movement, never the anatomy.
  *
  * Replacing a pose animation with a real photo, GIF or video is a one-field
  * change on the exercise (`media`), so upgrading the visuals later touches no
  * rendering code.
  */
 
-export type Pt = readonly [number, number];
+import {
+  ANCHORS,
+  JOINT_ORDER,
+  lerpRig,
+  normalise,
+  rigDistance,
+  toPose,
+  toRig,
+  trunkHeight,
+  type Joint,
+  type Pose,
+  type Pt,
+  type Rig,
+} from './skeleton';
 
-export interface Pose {
-  readonly head: Pt;
-  readonly neck: Pt;
-  readonly hip: Pt;
-  readonly shoulderL: Pt;
-  readonly elbowL: Pt;
-  readonly handL: Pt;
-  readonly shoulderR: Pt;
-  readonly elbowR: Pt;
-  readonly handR: Pt;
-  readonly kneeL: Pt;
-  readonly footL: Pt;
-  readonly kneeR: Pt;
-  readonly footR: Pt;
-}
-
-export const JOINT_ORDER = [
-  'head',
-  'neck',
-  'hip',
-  'shoulderL',
-  'elbowL',
-  'handL',
-  'shoulderR',
-  'elbowR',
-  'handR',
-  'kneeL',
-  'footL',
-  'kneeR',
-  'footR',
-] as const;
-
-/** Bones drawn between joints. The far-side limb is rendered de-emphasised. */
-export const BONES: readonly (readonly [keyof Pose, keyof Pose, 'near' | 'far' | 'core'])[] = [
-  ['neck', 'hip', 'core'],
-  ['shoulderL', 'elbowL', 'far'],
-  ['elbowL', 'handL', 'far'],
-  ['hip', 'kneeL', 'far'],
-  ['kneeL', 'footL', 'far'],
-  ['neck', 'shoulderR', 'core'],
-  ['shoulderR', 'elbowR', 'near'],
-  ['elbowR', 'handR', 'near'],
-  ['hip', 'kneeR', 'near'],
-  ['kneeR', 'footR', 'near'],
-  ['neck', 'shoulderL', 'core'],
-];
+export { BONES, JOINT_ORDER, GROUND, BONE_LENGTH } from './skeleton';
+export type { Pose, Pt, Joint } from './skeleton';
 
 /** Parse the compact "x,y x,y …" authoring format into a Pose. */
 function P(spec: string): Pose {
@@ -70,7 +45,7 @@ function P(spec: string): Pose {
   if (pts.length !== JOINT_ORDER.length) {
     throw new Error(`Pose needs ${JOINT_ORDER.length} joints, got ${pts.length}`);
   }
-  const out = {} as Record<keyof Pose, Pt>;
+  const out = {} as Record<Joint, Pt>;
   JOINT_ORDER.forEach((k, i) => {
     out[k] = pts[i]!;
   });
@@ -78,7 +53,12 @@ function P(spec: string): Pose {
 }
 
 // Joint order: head neck hip shL elL haL shR elR haR knL ftL knR ftR
-export const POSES = {
+/**
+ * The artwork, before normalisation. Exported for tests and tooling, which
+ * check that what the drawing says — which joints are on the floor, which way
+ * a joint bends — survives the rebuild. Screens draw `POSES`.
+ */
+export const DRAWN = {
   /* ---------------------------------------------------------------- debout */
   stand: P('50,12 50,22 50,52 46,24 44,36 43,48 54,24 56,36 57,48 47,74 46,96 53,74 54,96'),
   standTall: P('50,10 50,20 50,50 46,22 44,33 43,44 54,22 56,33 57,44 48,72 47,96 52,72 53,96'),
@@ -104,8 +84,8 @@ export const POSES = {
   dipsDown: P('48,38 50,46 54,66 47,46 40,56 40,60 53,46 60,56 60,60 62,80 66,94 66,80 70,92'),
 
   /* --------------------------------------------------------------- tirages */
-  hang: P('50,24 50,32 50,58 46,32 46,20 46,8 54,32 54,20 54,8 48,78 47,96 52,78 53,96'),
-  pullTop: P('50,14 50,22 50,50 45,22 40,14 46,8 55,22 60,14 54,8 47,70 46,92 53,70 54,92'),
+  hang: P('50,24 50,32 50,58 46,32 42,20 38,8 54,32 58,20 62,8 48,78 47,96 52,78 53,96'),
+  pullTop: P('50,22 50,30 50,58 44,32 30,28 38,8 56,32 70,28 62,8 47,78 46,96 53,78 54,96'),
   rowTop: P('26,52 34,54 62,64 34,56 34,44 34,34 36,56 36,44 36,34 76,72 90,90 78,70 92,88'),
   rowBottom: P('30,44 38,48 62,62 38,48 32,40 34,34 40,48 34,40 36,34 76,70 90,90 78,68 92,88'),
   superman: P('22,62 30,64 58,68 30,64 24,58 18,52 32,64 26,58 20,52 74,70 88,64 76,68 90,62'),
@@ -184,39 +164,163 @@ export const POSES = {
   breathe: P('50,16 50,26 50,56 46,28 44,42 46,54 54,28 56,42 54,54 46,76 45,96 54,76 55,96'),
   breatheIn: P('50,14 50,24 50,54 46,26 42,38 42,50 54,26 58,38 58,50 46,76 45,96 54,76 55,96'),
 } as const;
+export type PoseKey = keyof typeof DRAWN;
 
-export type PoseKey = keyof typeof POSES;
+const GROUND_ANCHOR = { kind: 'ground' } as const;
+const NORMALISED = new Map<PoseKey, Pose>();
+const RIG_CACHE = new Map<PoseKey, Rig>();
 
-const lerpPt = (a: Pt, b: Pt, t: number): Pt => [
-  a[0] + (b[0] - a[0]) * t,
-  a[1] + (b[1] - a[1]) * t,
-];
+/**
+ * Normalising a drawing costs a fraction of a millisecond, and no screen shows
+ * the whole library at once, so it is done on first use rather than at import:
+ * a session that demonstrates six exercises pays for six drawings, not eighty-nine.
+ */
+function poseOf(key: PoseKey): Pose {
+  let pose = NORMALISED.get(key);
+  if (!pose) {
+    pose = normalise(DRAWN[key], ANCHORS[key] ?? GROUND_ANCHOR);
+    NORMALISED.set(key, pose);
+  }
+  return pose;
+}
 
-/** Interpolate between two poses. `t` is clamped to 0…1. */
+function rigOf(key: PoseKey): Rig {
+  let rig = RIG_CACHE.get(key);
+  if (!rig) {
+    rig = toRig(poseOf(key));
+    RIG_CACHE.set(key, rig);
+  }
+  return rig;
+}
+
+/** The drawn poses, rebuilt on the canonical skeleton and planted on the floor. */
+export const POSES: Readonly<Record<PoseKey, Pose>> = Object.defineProperties(
+  {} as Record<PoseKey, Pose>,
+  Object.fromEntries(
+    (Object.keys(DRAWN) as PoseKey[]).map((k) => [
+      k,
+      { get: () => poseOf(k), enumerable: true } as PropertyDescriptor,
+    ]),
+  ),
+);
+
+/** Interpolate between two poses: hips travel, joints rotate, bones keep their length. */
 export function lerpPose(a: Pose, b: Pose, t: number): Pose {
-  const k = t < 0 ? 0 : t > 1 ? 1 : t;
-  const out = {} as Record<keyof Pose, Pt>;
-  for (const joint of JOINT_ORDER) out[joint] = lerpPt(a[joint], b[joint], k);
-  return out as Pose;
+  return toPose(lerpRig(toRig(a), toRig(b), t));
+}
+
+/* --------------------------------------------------------------- cadencing */
+
+/** Share of the cycle spent held at each end of the range. */
+const HOLD_SHARE = 0.07;
+/** How much slower the lowering half runs than the lifting half. */
+const ECCENTRIC_BIAS = 0.35;
+/** Trunk travel counted as a full range of motion, for that bias. */
+const FULL_RANGE = 7;
+
+type Entry =
+  | { readonly kind: 'hold'; readonly end: number; readonly frame: number }
+  | { readonly kind: 'run'; readonly end: number; readonly span: number; readonly at: readonly number[] };
+
+interface Cycle {
+  readonly frames: readonly Rig[];
+  readonly entries: readonly Entry[];
 }
 
 /**
+ * Turn a pose sequence into a timed, closed loop.
+ *
+ * Three things make the difference between a diagram twitching and a coach
+ * demonstrating. The loop is *closed* — the last frame is the first one, so the
+ * figure never teleports back to the start. Time inside a movement is spread by
+ * how far the body actually travels, so passing through a mid-position no
+ * longer costs as much as a full descent. And the ends of the range are *held*,
+ * with the figure easing in and out of them, which is what turns continuous
+ * wobble into visible repetitions.
+ */
+function buildCycle(keys: readonly PoseKey[]): Cycle {
+  const cyclic = new Set(keys).size < keys.length;
+  const order: PoseKey[] = cyclic
+    ? [...keys, keys[0]!]
+    : [...keys, ...keys.slice(0, -1).reverse()];
+  const frames = order.map((k) => rigOf(k));
+  const poses = order.map((k) => poseOf(k));
+
+  // Turnarounds: where the movement changes direction and the figure pauses.
+  const stops = cyclic
+    ? order.map((_, i) => i)
+    : [0, keys.length - 1, order.length - 1];
+
+  const runs = stops.slice(0, -1).map((from, i) => {
+    const to = stops[i + 1]!;
+    const costs: number[] = [];
+    for (let j = from; j < to; j++) costs.push(Math.max(0.001, rigDistance(frames[j]!, frames[j + 1]!)));
+    const total = costs.reduce((s, c) => s + c, 0);
+    // Lowering the body is the eccentric half: under control, so slower.
+    const drop = trunkHeight(poses[to]!) - trunkHeight(poses[from]!);
+    const bias = 1 + ECCENTRIC_BIAS * Math.max(-1, Math.min(1, drop / FULL_RANGE));
+    const at = costs.reduce<number[]>((acc, c) => [...acc, acc[acc.length - 1]! + c / total], [0]);
+    return { from, to, weight: total * bias, at };
+  });
+
+  const holdTotal = Math.min(0.4, HOLD_SHARE * runs.length);
+  const moveTotal = 1 - holdTotal;
+  const weightSum = runs.reduce((s, r) => s + r.weight, 0) || 1;
+
+  const entries: Entry[] = [];
+  let cursor = 0;
+  runs.forEach((run) => {
+    cursor += holdTotal / runs.length;
+    entries.push({ kind: 'hold', end: cursor, frame: run.from });
+    cursor += (run.weight / weightSum) * moveTotal;
+    entries.push({ kind: 'run', end: cursor, span: run.from, at: run.at });
+  });
+  const last = entries[entries.length - 1]!;
+  entries[entries.length - 1] = { ...last, end: 1 } as Entry;
+
+  return { frames, entries };
+}
+
+const CYCLES = new Map<string, Cycle>();
+
+function cycleFor(keys: readonly PoseKey[]): Cycle {
+  const id = keys.join('|');
+  let built = CYCLES.get(id);
+  if (!built) {
+    built = buildCycle(keys);
+    CYCLES.set(id, built);
+  }
+  return built;
+}
+
+/** Zero velocity *and* zero acceleration at both ends: no visible kick. */
+const smootherstep = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
+
+/**
  * Sample a looping animation across a pose sequence.
- * `phase` runs 0…1 over one complete cycle; sequences of length 2 play
- * out-and-back so a push-up returns to the top rather than snapping.
+ * `phase` runs 0…1 over one complete repetition.
  */
 export function samplePoseCycle(keys: readonly PoseKey[], phase: number): Pose {
   const seq = keys.length > 0 ? keys : (['stand'] as const);
-  if (seq.length === 1) return POSES[seq[0]!];
+  if (seq.length === 1) return poseOf(seq[0]!);
 
-  // Play forwards then backwards for a natural out-and-back rhythm.
-  const loop = [...seq, ...seq.slice(1, -1).reverse()];
-  const span = loop.length - 1;
+  const { frames, entries } = cycleFor(seq);
   const p = ((phase % 1) + 1) % 1;
-  const pos = p * span;
-  const i = Math.min(Math.floor(pos), span - 1);
-  // Ease each segment so the figure decelerates into each position.
-  const raw = pos - i;
-  const t = raw < 0.5 ? 2 * raw * raw : 1 - 2 * (1 - raw) * (1 - raw);
-  return lerpPose(POSES[loop[i]!], POSES[loop[i + 1]!], t);
+
+  let i = 0;
+  while (i < entries.length - 1 && p >= entries[i]!.end) i++;
+  const entry = entries[i]!;
+  if (entry.kind === 'hold') return toPose(frames[entry.frame]!);
+
+  const start = i === 0 ? 0 : entries[i - 1]!.end;
+  const u = smootherstep(Math.max(0, Math.min(1, (p - start) / Math.max(1e-6, entry.end - start))));
+
+  // Even travel through the run: a long segment takes proportionally longer.
+  const { at, span } = entry;
+  let s = 0;
+  while (s < at.length - 2 && u >= at[s + 1]!) s++;
+  const a = at[s]!;
+  const b = at[s + 1]!;
+  const local = (u - a) / Math.max(1e-6, b - a);
+  return toPose(lerpRig(frames[span + s]!, frames[span + s + 1]!, local));
 }
