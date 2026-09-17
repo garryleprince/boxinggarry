@@ -1,30 +1,29 @@
 import { useEffect, useMemo, useRef } from 'react';
 import {
-  BONES,
   POSES,
   emphasisFor,
   samplePoseCycle,
   supportFor,
-  type BonePart,
   type Cadence,
   type Emphasis,
   type Pose,
   type PoseKey,
 } from '@/data/poses';
+import { headEgg, pieces, type PartName } from './mannequin';
 import { useAnimationsEnabled } from './motion';
 
 /**
- * Animated exercise illustration.
+ * Animated exercise illustration: a wooden artist's mannequin.
  *
- * Draws the 13-joint skeleton and walks it through the exercise's pose
- * sequence, so the athlete sees the movement — start position, motion, end
- * position — rather than a frozen shape. Everything is inline SVG: no
- * requests, no copyright, works offline from the first launch.
+ * Walks the figure through the exercise's pose sequence, so the athlete sees
+ * the movement — start position, motion, end position — rather than a frozen
+ * shape. Everything is inline SVG: no requests, no copyright, works offline
+ * from the first launch.
  *
- * The figure is moved by writing straight to the SVG attributes on one shared
- * animation frame, not by re-rendering React sixty times a second. On a phone
- * that is the difference between a demonstration and a stutter, and it lets
- * several figures on one screen share a single timer.
+ * The figure is moved by writing straight to the SVG path data on one shared
+ * animation frame, not by re-rendering React sixty times a second. Which limb
+ * is in front is a class, not a colour written per frame, so the shading fades
+ * across without costing anything.
  *
  * When an exercise carries a `media` asset, callers render that instead; this
  * component is the default and the fallback.
@@ -60,11 +59,6 @@ const DEFAULT_CYCLE = 2.6;
 /** A held position breathes on its own clock, not the exercise's tempo. */
 const BREATH_SEC = 4.6;
 
-const HEAD_RADIUS = 6.6;
-const NEAR_WIDTH = 4.2;
-const FAR_WIDTH = 3.4;
-const FAR_OPACITY = 0.55;
-
 export interface FigureProps {
   poses: readonly PoseKey[];
   /** Seconds for one complete repetition. Clamped to a watchable range. */
@@ -79,19 +73,25 @@ export interface FigureProps {
   label?: string;
 }
 
-/** How far forward a limb is drawn: 0 fully behind, 1 fully in front. */
-function prominence(part: BonePart, emphasis: Emphasis): number {
+/**
+ * Whether a part is set back from the viewer.
+ *
+ * `emphasis` runs −1 (left side leading) to +1 (right), and its neutral value
+ * is the drawing convention the library has always used: right side forward.
+ * So a limb is behind whenever the emphasis leans away from it at all.
+ */
+function isFar(part: PartName, emphasis: Emphasis): boolean {
   switch (part) {
     case 'armL':
-      return (1 - emphasis.arms) / 2;
+      return emphasis.arms > 0;
     case 'armR':
-      return (1 + emphasis.arms) / 2;
+      return emphasis.arms < 0;
     case 'legL':
-      return (1 - emphasis.legs) / 2;
+      return emphasis.legs > 0;
     case 'legR':
-      return (1 + emphasis.legs) / 2;
+      return emphasis.legs < 0;
     default:
-      return 1;
+      return false;
   }
 }
 
@@ -118,44 +118,33 @@ export function Figure({
   const frozen = still || !animationsEnabled;
   const ghost = frozen && keys.length > 1 ? POSES[keys[0]!] : null;
   const shown = POSES[frozen ? keys[keys.length - 1]! : keys[0]!] ?? POSES.stand;
+  const layout = useMemo(() => pieces(shown), [shown]);
   const shownEmphasis = emphasisFor(keys, shown);
   const support = supportFor(keys);
 
-  const behind = useRef<(SVGLineElement | null)[]>([]);
-  const front = useRef<(SVGLineElement | null)[]>([]);
-  const head = useRef<SVGCircleElement | null>(null);
+  const parts = useRef<(SVGPathElement | null)[]>([]);
+  const head = useRef<SVGPathElement | null>(null);
 
   useEffect(() => {
     if (frozen) return;
     const period =
       keys.length < 2 ? BREATH_SEC : Math.min(MAX_CYCLE, Math.max(MIN_CYCLE, cycleSec));
     const start = performance.now();
+    const behind = new Map<number, boolean>();
 
     const draw = (pose: Pose) => {
       const emphasis = emphasisFor(keys, pose);
-      BONES.forEach(([a, b, part], i) => {
-        const coords = [pose[a][0], pose[a][1], pose[b][0], pose[b][1]];
-        const forward = front.current[i];
-        const back = behind.current[i];
-        for (const el of [forward, back]) {
-          if (!el) continue;
-          el.setAttribute('x1', coords[0]!.toFixed(2));
-          el.setAttribute('y1', coords[1]!.toFixed(2));
-          el.setAttribute('x2', coords[2]!.toFixed(2));
-          el.setAttribute('y2', coords[3]!.toFixed(2));
-        }
-        if (forward && back) {
-          // Crossfade rather than switch: the working side comes forward as the
-          // movement reaches it, with nothing popping on the way.
-          const p = prominence(part, emphasis);
-          forward.setAttribute('opacity', p.toFixed(3));
-          back.setAttribute('opacity', (FAR_OPACITY * (1 - p)).toFixed(3));
+      pieces(pose).forEach((piece, i) => {
+        const el = parts.current[i];
+        if (!el) return;
+        el.setAttribute('d', piece.d);
+        const far = isFar(piece.part, emphasis);
+        if (behind.get(i) !== far) {
+          behind.set(i, far);
+          el.classList.toggle('is-far', far);
         }
       });
-      if (head.current) {
-        head.current.setAttribute('cx', pose.head[0].toFixed(2));
-        head.current.setAttribute('cy', pose.head[1].toFixed(2));
-      }
+      head.current?.setAttribute('d', headEgg(pose));
     };
 
     const stop = subscribe((now) =>
@@ -198,75 +187,27 @@ export function Figure({
           strokeLinecap="round"
         />
       ))}
-      {ghost
-        ? BONES.map(([a, b, part], i) => (
-            <line
-              key={`ghost-${i}`}
-              x1={ghost[a][0]}
-              y1={ghost[a][1]}
-              x2={ghost[b][0]}
-              y2={ghost[b][1]}
-              stroke="var(--text-3)"
-              strokeWidth={part === 'core' ? 5 : 4}
-              strokeLinecap="round"
-              opacity={0.28}
-            />
-          ))
-        : null}
       {ghost ? (
-        <circle
-          cx={ghost.head[0]}
-          cy={ghost.head[1]}
-          r={HEAD_RADIUS}
-          fill="var(--text-3)"
-          opacity={0.28}
-        />
+        <g className="mann__ghost">
+          {pieces(ghost).map((piece, i) => (
+            <path key={`ghost-${i}`} className={piece.seam ? 'mann__seam' : 'mann__part'} d={piece.d} />
+          ))}
+          <path className="mann__part" d={headEgg(ghost)} />
+        </g>
       ) : null}
-      {/* Every limb is drawn twice — set back, then forward — and the two are
-          crossfaded so the side doing the work is the one you see. */}
-      {BONES.map(([a, b, part], i) =>
-        part === 'core' ? null : (
-          <line
-            key={`behind-${i}`}
-            ref={(el) => {
-              behind.current[i] = el;
-            }}
-            x1={shown[a][0]}
-            y1={shown[a][1]}
-            x2={shown[b][0]}
-            y2={shown[b][1]}
-            stroke="var(--text-3)"
-            strokeWidth={FAR_WIDTH}
-            strokeLinecap="round"
-            opacity={FAR_OPACITY * (1 - prominence(part, shownEmphasis))}
-          />
-        ),
-      )}
-      {BONES.map(([a, b, part], i) => (
-        <line
-          key={`front-${i}`}
+      {layout.map((piece, i) => (
+        <path
+          key={i}
           ref={(el) => {
-            front.current[i] = el;
+            parts.current[i] = el;
           }}
-          x1={shown[a][0]}
-          y1={shown[a][1]}
-          x2={shown[b][0]}
-          y2={shown[b][1]}
-          stroke="var(--text-1)"
-          strokeWidth={part === 'core' ? 5 : NEAR_WIDTH}
-          strokeLinecap="round"
-          opacity={part === 'core' ? 1 : prominence(part, shownEmphasis)}
+          className={`${piece.seam ? 'mann__seam' : 'mann__part'}${
+            isFar(piece.part, shownEmphasis) ? ' is-far' : ''
+          }`}
+          d={piece.d}
         />
       ))}
-      <circle
-        ref={head}
-        cx={shown.head[0]}
-        cy={shown.head[1]}
-        r={HEAD_RADIUS}
-        fill="var(--signal)"
-        stroke="var(--ink-0)"
-        strokeWidth="1.2"
-      />
+      <path ref={head} className="mann__part" d={headEgg(shown)} />
     </svg>
   );
 }

@@ -22,6 +22,13 @@
   --text-2: #a8aeb9;
   --text-3: #6e7480;
 
+  /* Bois du mannequin. Le côté proche est éclairé, le côté opposé est dans
+     l'ombre : c'est ce qui donne sa profondeur à une figure dessinée à plat. */
+  --wood: #dcc29c;
+  --wood-shade: #7b6a4e;
+  --wood-edge: #453a2c;
+  --wood-seam: #8d7555;
+
   /* Signal — used for the single most important action on a screen. */
   --signal: #e8402a;
   --signal-hot: #ff5a42;
@@ -100,6 +107,11 @@
   --text-2: #545c६9;
   --text-2: #545c69;
   --text-3: #8b93a1;
+
+  --wood: #c19a68;
+  --wood-shade: #8a6d48;
+  --wood-edge: #5a4732;
+  --wood-seam: #8a6b47;
 
   --signal: #d0331f;
   --signal-hot: #b82a18;

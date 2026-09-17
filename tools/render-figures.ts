@@ -11,14 +11,8 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import {
-  BONES,
-  emphasisFor,
-  samplePoseCycle,
-  supportFor,
-  type Pose,
-  type PoseKey,
-} from '../src/data/poses';
+import { emphasisFor, samplePoseCycle, supportFor, type Pose, type PoseKey } from '../src/data/poses';
+import { headEgg, pieces } from '../src/ui/mannequin';
 import { PATTERN_CADENCE } from '../src/domain/model/taxonomy';
 import { EXERCISES } from '../src/data/exercises';
 
@@ -27,43 +21,34 @@ const CELL = 100;
 const ROW = 108;
 const OUT = 'figures.svg';
 
-const INK = '#e8ecf4';
-const DIM = '#8b93a7';
-const BACK = '#12151c';
-const SIGNAL = '#ff5a36';
+const BACK = '#08090b';
+const LINE = '#272c35';
+const WOOD = '#dcc29c';
+const SHADE = '#7b6a4e';
+const EDGE = '#453a2c';
+const SEAM = '#8d7555';
 
-function bones(pose: Pose, keys: readonly PoseKey[]): string {
+function figure(pose: Pose, keys: readonly PoseKey[]): string {
   const emphasis = emphasisFor(keys, pose);
-  const forward = (part: string): number =>
-    part === 'core'
-      ? 1
-      : part === 'armL'
-        ? (1 - emphasis.arms) / 2
-        : part === 'armR'
-          ? (1 + emphasis.arms) / 2
-          : part === 'legL'
-            ? (1 - emphasis.legs) / 2
-            : (1 + emphasis.legs) / 2;
-  const line = (
-    a: [number, number] | readonly [number, number],
-    b: [number, number] | readonly [number, number],
-    colour: string,
-    width: number,
-    opacity: number,
-  ) =>
-    `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${colour}" stroke-width="${width}" stroke-linecap="round" opacity="${opacity.toFixed(3)}"/>`;
-  return (
-    BONES.filter(([, , part]) => part !== 'core')
-      .map(([a, b, part]) => line(pose[a], pose[b], DIM, 3.4, 0.55 * (1 - forward(part))))
-      .join('') +
-    BONES.map(([a, b, part]) =>
-      line(pose[a], pose[b], INK, part === 'core' ? 5 : 4.2, forward(part)),
-    ).join('')
-  );
+  const far = (part: string): boolean =>
+    part === 'armL'
+      ? emphasis.arms > 0
+      : part === 'armR'
+        ? emphasis.arms < 0
+        : part === 'legL'
+          ? emphasis.legs > 0
+          : part === 'legR'
+            ? emphasis.legs < 0
+            : false;
+  const body = pieces(pose)
+    .map((piece) =>
+      piece.seam
+        ? `<path d="${piece.d}" fill="none" stroke="${far(piece.part) ? EDGE : SEAM}" stroke-width="0.9"/>`
+        : `<path d="${piece.d}" fill="${far(piece.part) ? SHADE : WOOD}" stroke="${EDGE}" stroke-width="0.7" stroke-linejoin="round"/>`,
+    )
+    .join('');
+  return `${body}<path d="${headEgg(pose)}" fill="${WOOD}" stroke="${EDGE}" stroke-width="0.7"/>`;
 }
-
-const head = (pose: Pose): string =>
-  `<circle cx="${pose.head[0].toFixed(1)}" cy="${pose.head[1].toFixed(1)}" r="6.6" fill="${SIGNAL}" stroke="${BACK}" stroke-width="1.2"/>`;
 
 const seen = new Set<string>();
 const rows: { label: string; keys: readonly PoseKey[]; cadence: ReturnType<() => (typeof PATTERN_CADENCE)[keyof typeof PATTERN_CADENCE]> }[] = [];
@@ -80,15 +65,15 @@ let svg =
 
 rows.forEach(({ label, keys, cadence }, row) => {
   const support = supportFor(keys)
-    .map(([x1, y1, x2, y2]) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#2a3040" stroke-width="1.5" stroke-linecap="round"/>`)
+    .map(([x1, y1, x2, y2]) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${LINE}" stroke-width="1.5" stroke-linecap="round"/>`)
     .join('');
   for (let frame = 0; frame < FRAMES; frame++) {
     const pose = samplePoseCycle(keys, frame / FRAMES, cadence);
     svg += `<g transform="translate(${frame * CELL},${row * ROW + 6})">`;
-    svg += `<line x1="4" y1="98" x2="96" y2="98" stroke="#2a3040" stroke-width="1.5" stroke-linecap="round"/>`;
-    svg += support + bones(pose, keys) + head(pose);
+    svg += `<line x1="4" y1="98" x2="96" y2="98" stroke="${LINE}" stroke-width="1.5" stroke-linecap="round"/>`;
+    svg += support + figure(pose, keys);
     if (frame === 0) {
-      svg += `<text x="3" y="8" font-family="system-ui,sans-serif" font-size="6" fill="${DIM}">${label.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`;
+      svg += `<text x="3" y="8" font-family="system-ui,sans-serif" font-size="6" fill="#8b93a7">${label.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`;
     }
     svg += `</g>`;
   }

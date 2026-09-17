@@ -262,7 +262,7 @@ export function Training() {
 
       <div className="train__body">
         {exercise ? (
-          <div className="train__figure" style={{ opacity: phase?.kind === 'travail' ? 1 : 0.45 }}>
+          <div className="train__figure" style={{ opacity: phase?.kind === 'travail' ? 1 : 0.62 }}>
             <Figure
               poses={exercise.poses}
               size="100%"

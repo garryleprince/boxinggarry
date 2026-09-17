@@ -1191,3 +1191,49 @@
   padding-right: max(var(--s-4), var(--safe-right));
   padding-bottom: var(--s-2);
 }
+
+/* ------------------------------------------------------------- mannequin */
+
+/**
+ * Le mannequin est taillé dans un seul bois. Le membre qui est derrière passe
+ * dans l'ombre, et la bascule entre les deux est confiée à une transition CSS
+ * plutôt qu'à l'animation : le fondu reste fluide sans coûter une seule
+ * recoloration par image.
+ */
+.mann__part {
+  fill: var(--wood);
+  stroke: var(--wood-edge);
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+  transition: fill 220ms linear, stroke 220ms linear;
+}
+
+.mann__part.is-far {
+  fill: var(--wood-shade);
+}
+
+.mann__seam {
+  fill: none;
+  stroke: var(--wood-seam);
+  stroke-width: 0.9;
+  transition: stroke 220ms linear;
+}
+
+.mann__seam.is-far {
+  stroke: var(--wood-edge);
+}
+
+.mann__ghost .mann__part,
+.mann__ghost .mann__seam {
+  fill: var(--text-3);
+  stroke: var(--text-3);
+  opacity: 0.22;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mann__part,
+  .mann__seam {
+    transition: none;
+  }
+}

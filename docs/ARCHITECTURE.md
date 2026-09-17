@@ -292,8 +292,9 @@ d'entraînement.
 
 ## 7. Illustrations
 
-Un squelette de 13 articulations dessiné dans un `viewBox` de 100 × 100, animé
-d'une pose à l'autre et rendu en SVG inline. Quatre-vingt-neuf poses couvrent
+Un mannequin de bois articulé, construit sur un squelette de 13 articulations
+dessiné dans un `viewBox` de 100 × 100, animé d'une pose à l'autre et rendu en
+SVG inline. Quatre-vingt-neuf poses couvrent
 toute la base d'exercices, pour quelques kilo-octets.
 
 Pourquoi pas des images ou des GIF : le poids sur réseau mobile, la
@@ -301,6 +302,58 @@ disponibilité hors connexion dès la première ouverture, et surtout les droits
 aucune illustration sous copyright n'est utilisée. Un champ `media` par
 exercice permet de basculer vers une photo, un GIF ou une vidéo sans toucher
 au code de rendu (§25).
+
+### Un mannequin, pas un bonhomme en bâtons
+
+Un bonhomme en bâtons dit où sont les articulations ; un mannequin dit ce que
+le corps fait. La différence tient en trois choses, et ce sont exactement
+celles qu'un mannequin d'atelier a et qu'un trait n'a pas.
+
+**Du volume.** Chaque os est le contour de deux cercles et de tout ce qui les
+sépare — une cuisse plus épaisse qu'un tibia, un bras plus épais qu'un
+avant-bras. Un trait fait la même largeur d'un bout à l'autre, et aucune partie
+d'un corps n'est comme ça.
+
+**Des rotules.** Une bille à chaque articulation, avec une couture par-dessus.
+C'est la signature visuelle du mannequin, et c'est aussi ce qui rend lisible
+l'endroit exact où le corps plie.
+
+**Des mains et des pieds.** C'est le plus gros gain, parce que c'est ce qui dit
+si un talon décolle ou si un poing est fermé. La bibliothèque n'a qu'une
+articulation par pied, et c'est le point sur lequel la pose repose : le pied
+est donc dessiné *depuis* ce point, jamais au-delà, sinon il traverserait le
+sol. Trois cas, et le dernier est ce qui fait qu'un gainage ressemble à un
+gainage — à plat ventre les pieds sont sur la pointe, pas posés à plat.
+
+Le torse est en deux blocs, poitrine et bassin, articulés par une bille à la
+taille, avec un joug qui ramène chaque épaule vers la colonne : une bille qui
+flotte à côté du buste se lit comme un membre détaché, aussi bien le bras
+soit-il dessiné. Et les deux cuisses partent de deux hanches écartées sur le
+bassin, pas du même point.
+
+Le bois est un jeu de jetons (`--wood`, `--wood-shade`, `--wood-edge`,
+`--wood-seam`), décliné pour les deux thèmes : un bois pâle sur le fond presque
+noir, un bois plus profond sur le fond clair. Le membre qui est derrière passe
+dans l'ombre, et la bascule est confiée à une transition CSS plutôt qu'à
+l'animation — le fondu reste fluide sans coûter une seule recoloration par
+image. Toute la géométrie est recalculée par image : 53 µs, soit trois
+millièmes du budget d'une image à 60 Hz.
+
+### Ce qui reste cassé, et qui se voit maintenant
+
+Les poses sont posées au sol une par une ; les images *entre* elles ne le sont
+pas. Les angles articulaires prennent le plus court chemin d'une pose à la
+suivante, et le plus court chemin pour une jambe qui passe de tendue à ramenée
+fait décrire au pied un arc qui plonge sous le sol : **36 exercices sur 99**,
+jusqu'à 13,6 unités. En traits fins, une jambe qui croise une ligne fine ne se
+remarque pas. Avec un pied plein, si.
+
+Deux rattrapages ont été essayés et mesurés, tous deux écartés : replier le
+membre par cinématique inverse à chaque image introduit des ruptures allant
+jusqu'à 24 unités quand la correction devient grande, et remonter toute la
+figure la fait sautiller d'autant. La correction se fait à la source — une pose
+intermédiaire par famille de mouvement, qui garde le genou fléchi pendant que
+la cuisse balaie — et c'est du travail de dessin, exercice par exercice.
 
 ### Le dessin dit le mouvement, le squelette dit le corps
 
