@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { EXERCISES } from '@/data/exercises';
-import { BONES, DRAWN, JOINT_ORDER, POSES, samplePoseCycle, type PoseKey } from '@/data/poses';
+import {
+  BONES,
+  DRAWN,
+  JOINT_ORDER,
+  POSES,
+  emphasisFor,
+  samplePoseCycle,
+  supportFor,
+  type PoseKey,
+} from '@/data/poses';
 import { ANCHORS, BONE_LENGTH, GROUND, contactsOf, dist, trunkHeight, type Joint } from '@/data/skeleton';
+import { PATTERN_CADENCE } from '@/domain/model/taxonomy';
 
 /**
  * The exercise figures are the app's only demonstration of *how* to move, so
@@ -224,6 +234,117 @@ describe('animation', () => {
     for (const exercise of EXERCISES) {
       expect(exercise.poses.length, exercise.id).toBeGreaterThan(0);
       for (const key of exercise.poses) expect(POSES[key], `${exercise.id}/${key}`).toBeTruthy();
+    }
+  });
+});
+
+describe('positions tenues', () => {
+  const HELD = EXERCISES.filter((e) => e.poses.length === 1);
+
+  it('fait respirer les isométries au lieu de les figer', () => {
+    // Douze exercices tiennent une seule position. Une figure parfaitement
+    // immobile se lit comme une image cassée, pas comme « tiens la position ».
+    expect(HELD.length).toBeGreaterThan(8);
+    for (const exercise of HELD) {
+      const travel = Math.max(
+        ...JOINT_ORDER.map((j) =>
+          dist(samplePoseCycle(exercise.poses, 0)[j], samplePoseCycle(exercise.poses, 0.5)[j]),
+        ),
+      );
+      expect(travel, exercise.name).toBeGreaterThan(1.5);
+      expect(travel, exercise.name).toBeLessThan(4);
+    }
+  });
+
+  it('garde les appuis au sol pendant qu’elles respirent', () => {
+    // Un souffle soulève le corps, pas le sol.
+    for (const exercise of HELD) {
+      const key = exercise.poses[0]!;
+      if ((ANCHORS[key] ?? { kind: 'ground' }).kind !== 'ground') continue;
+      for (const phase of [0, 0.25, 0.5, 0.75]) {
+        const pose = samplePoseCycle(exercise.poses, phase);
+        for (const joint of contactsOf(DRAWN[key])) {
+          expect(Math.abs(pose[joint][1] - GROUND), `${exercise.name} ${joint}`).toBeLessThan(7);
+        }
+      }
+    }
+  });
+});
+
+describe('appuis dessinés', () => {
+  it('dessine le support des exercices qui reposent sur autre chose que le sol', () => {
+    const suspendus = ['tractions', 'tractions-negatives', 'suspension-barre', 'rowing-australien', 'dips-chaise', 'pompes-inclinees', 'pompes-murales', 'pompes-pieds-sureleves', 'chaise-murale'];
+    for (const id of suspendus) {
+      const exercise = EXERCISES.find((e) => e.id === id);
+      expect(exercise, id).toBeTruthy();
+      expect(supportFor(exercise!.poses).length, id).toBeGreaterThan(0);
+    }
+  });
+
+  it('ne dessine rien sous un exercice qui se fait au sol', () => {
+    // Les pompes piquées partagent leurs poses avec la version pieds surélevés :
+    // dessiner un banc sous la version au sol serait un mensonge.
+    for (const id of ['pompes', 'pompes-pike', 'gainage-ventral', 'squat']) {
+      const exercise = EXERCISES.find((e) => e.id === id);
+      if (!exercise) continue;
+      expect(supportFor(exercise.poses).length, id).toBe(0);
+    }
+  });
+});
+
+describe('membre moteur', () => {
+  const at = (keys: readonly PoseKey[], phase: number) =>
+    emphasisFor(keys, samplePoseCycle(keys, phase));
+
+  it('met en avant le côté qui travaille sur les mouvements alternés', () => {
+    const swings = (keys: readonly PoseKey[], side: 'arms' | 'legs') => {
+      const values = Array.from({ length: 40 }, (_, i) => at(keys, i / 40)[side]);
+      return { min: Math.min(...values), max: Math.max(...values) };
+    };
+    // Bras : la main qui frappe, puis l'autre. Jambes : le genou qui monte.
+    expect(swings(['jab', 'cross'], 'arms').min).toBeLessThan(-0.5);
+    expect(swings(['jab', 'cross'], 'arms').max).toBeGreaterThan(0.5);
+    expect(swings(['plank', 'plankTapA', 'plank', 'plankTapB'], 'arms').min).toBeLessThan(-0.5);
+    expect(swings(['kneeHighL', 'kneeHighR'], 'legs').min).toBeLessThan(-0.5);
+    expect(swings(['kneeHighL', 'kneeHighR'], 'legs').max).toBeGreaterThan(0.5);
+    expect(swings(['climberA', 'climberB'], 'legs').min).toBeLessThan(-0.5);
+    expect(swings(['climberA', 'climberB'], 'legs').max).toBeGreaterThan(0.5);
+  });
+
+  it('ne bouge pas sur un mouvement symétrique', () => {
+    // Un dessin très légèrement asymétrique ne doit pas faire dériver l'ombrage
+    // d'un côté à l'autre pendant la répétition : ce serait pire que fixe.
+    for (const keys of [['pushTop', 'pushBottom'], ['stand', 'squatBottom'], ['hingeTop', 'hingeBottom']] as const) {
+      for (let i = 0; i < 40; i++) {
+        const e = at(keys, i / 40);
+        expect(e.arms, `${keys.join('→')} bras`).toBeCloseTo(0.5, 1);
+        expect(e.legs, `${keys.join('→')} jambes`).toBeCloseTo(0.5, 1);
+      }
+    }
+  });
+});
+
+describe('cadence', () => {
+  it('donne à chaque famille de mouvement sa propre phrase', () => {
+    const heldShare = (keys: readonly PoseKey[], cadence: Parameters<typeof samplePoseCycle>[2]) => {
+      const N = 400;
+      let still = 0;
+      for (let i = 0; i < N; i++) {
+        const a = samplePoseCycle(keys, i / N, cadence);
+        const b = samplePoseCycle(keys, (i + 1) / N, cadence);
+        if (JOINT_ORDER.every((j) => dist(a[j], b[j]) < 0.04)) still++;
+      }
+      return still / N;
+    };
+    const jump = ['squatBottom', 'jumpAir'] as const;
+    // Un saut suspend en l'air ; une mobilité tient ses deux fins de course.
+    expect(heldShare(jump, 'explosif')).toBeGreaterThan(heldShare(jump, 'standard'));
+    expect(heldShare(['cat', 'cow'], 'souple')).toBeGreaterThan(heldShare(['cat', 'cow'], 'standard'));
+  });
+
+  it('attribue une cadence à chaque motif de mouvement', () => {
+    for (const exercise of EXERCISES) {
+      expect(PATTERN_CADENCE[exercise.pattern], exercise.id).toBeTruthy();
     }
   });
 });

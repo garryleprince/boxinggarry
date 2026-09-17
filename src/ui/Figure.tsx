@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { BONES, POSES, samplePoseCycle, type Pose, type PoseKey } from '@/data/poses';
+import {
+  BONES,
+  POSES,
+  emphasisFor,
+  samplePoseCycle,
+  supportFor,
+  type BonePart,
+  type Cadence,
+  type Emphasis,
+  type Pose,
+  type PoseKey,
+} from '@/data/poses';
 import { useAnimationsEnabled } from './motion';
 
 /**
@@ -43,14 +54,23 @@ function subscribe(tick: Tick): () => void {
 }
 
 /** Sensible bounds for a demonstration, whatever tempo the exercise prescribes. */
-const MIN_CYCLE = 1.3;
-const MAX_CYCLE = 4.5;
+const MIN_CYCLE = 1.2;
+const MAX_CYCLE = 6;
 const DEFAULT_CYCLE = 2.6;
+/** A held position breathes on its own clock, not the exercise's tempo. */
+const BREATH_SEC = 4.6;
+
+const HEAD_RADIUS = 6.6;
+const NEAR_WIDTH = 4.2;
+const FAR_WIDTH = 3.4;
+const FAR_OPACITY = 0.55;
 
 export interface FigureProps {
   poses: readonly PoseKey[];
   /** Seconds for one complete repetition. Clamped to a watchable range. */
   cycleSec?: number;
+  /** How the repetition is phrased: explosive, flowing, sharp, or plain. */
+  cadence?: Cadence;
   /** Freeze on the movement's end position — for reduced motion or thumbnails. */
   still?: boolean;
   size?: number | string;
@@ -59,11 +79,26 @@ export interface FigureProps {
   label?: string;
 }
 
-const HEAD_RADIUS = 6.6;
+/** How far forward a limb is drawn: 0 fully behind, 1 fully in front. */
+function prominence(part: BonePart, emphasis: Emphasis): number {
+  switch (part) {
+    case 'armL':
+      return (1 - emphasis.arms) / 2;
+    case 'armR':
+      return (1 + emphasis.arms) / 2;
+    case 'legL':
+      return (1 - emphasis.legs) / 2;
+    case 'legR':
+      return (1 + emphasis.legs) / 2;
+    default:
+      return 1;
+  }
+}
 
 export function Figure({
   poses,
   cycleSec = DEFAULT_CYCLE,
+  cadence = 'standard',
   still = false,
   size = '100%',
   className,
@@ -83,23 +118,39 @@ export function Figure({
   const frozen = still || !animationsEnabled;
   const ghost = frozen && keys.length > 1 ? POSES[keys[0]!] : null;
   const shown = POSES[frozen ? keys[keys.length - 1]! : keys[0]!] ?? POSES.stand;
+  const shownEmphasis = emphasisFor(keys, shown);
+  const support = supportFor(keys);
 
-  const lines = useRef<(SVGLineElement | null)[]>([]);
+  const behind = useRef<(SVGLineElement | null)[]>([]);
+  const front = useRef<(SVGLineElement | null)[]>([]);
   const head = useRef<SVGCircleElement | null>(null);
 
   useEffect(() => {
-    if (frozen || keys.length < 2) return;
-    const period = Math.min(MAX_CYCLE, Math.max(MIN_CYCLE, cycleSec));
+    if (frozen) return;
+    const period =
+      keys.length < 2 ? BREATH_SEC : Math.min(MAX_CYCLE, Math.max(MIN_CYCLE, cycleSec));
     const start = performance.now();
 
     const draw = (pose: Pose) => {
-      BONES.forEach(([a, b], i) => {
-        const el = lines.current[i];
-        if (!el) return;
-        el.setAttribute('x1', pose[a][0].toFixed(2));
-        el.setAttribute('y1', pose[a][1].toFixed(2));
-        el.setAttribute('x2', pose[b][0].toFixed(2));
-        el.setAttribute('y2', pose[b][1].toFixed(2));
+      const emphasis = emphasisFor(keys, pose);
+      BONES.forEach(([a, b, part], i) => {
+        const coords = [pose[a][0], pose[a][1], pose[b][0], pose[b][1]];
+        const forward = front.current[i];
+        const back = behind.current[i];
+        for (const el of [forward, back]) {
+          if (!el) continue;
+          el.setAttribute('x1', coords[0]!.toFixed(2));
+          el.setAttribute('y1', coords[1]!.toFixed(2));
+          el.setAttribute('x2', coords[2]!.toFixed(2));
+          el.setAttribute('y2', coords[3]!.toFixed(2));
+        }
+        if (forward && back) {
+          // Crossfade rather than switch: the working side comes forward as the
+          // movement reaches it, with nothing popping on the way.
+          const p = prominence(part, emphasis);
+          forward.setAttribute('opacity', p.toFixed(3));
+          back.setAttribute('opacity', (FAR_OPACITY * (1 - p)).toFixed(3));
+        }
       });
       if (head.current) {
         head.current.setAttribute('cx', pose.head[0].toFixed(2));
@@ -107,10 +158,12 @@ export function Figure({
       }
     };
 
-    const stop = subscribe((now) => draw(samplePoseCycle(keys, ((now - start) / 1000 / period) % 1)));
-    draw(samplePoseCycle(keys, 0));
+    const stop = subscribe((now) =>
+      draw(samplePoseCycle(keys, ((now - start) / 1000 / period) % 1, cadence)),
+    );
+    draw(samplePoseCycle(keys, 0, cadence));
     return stop;
-  }, [keys, cycleSec, frozen]);
+  }, [keys, cycleSec, cadence, frozen]);
 
   return (
     <svg
@@ -132,8 +185,21 @@ export function Figure({
         strokeWidth="1.5"
         strokeLinecap="round"
       />
+      {/* The wall, chair or bar the movement rests on. */}
+      {support.map(([x1, y1, x2, y2], i) => (
+        <line
+          key={`support-${i}`}
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke="var(--line)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      ))}
       {ghost
-        ? BONES.map(([a, b, weight], i) => (
+        ? BONES.map(([a, b, part], i) => (
             <line
               key={`ghost-${i}`}
               x1={ghost[a][0]}
@@ -141,7 +207,7 @@ export function Figure({
               x2={ghost[b][0]}
               y2={ghost[b][1]}
               stroke="var(--text-3)"
-              strokeWidth={weight === 'core' ? 5 : 4}
+              strokeWidth={part === 'core' ? 5 : 4}
               strokeLinecap="round"
               opacity={0.28}
             />
@@ -156,20 +222,40 @@ export function Figure({
           opacity={0.28}
         />
       ) : null}
-      {BONES.map(([a, b, weight], i) => (
+      {/* Every limb is drawn twice — set back, then forward — and the two are
+          crossfaded so the side doing the work is the one you see. */}
+      {BONES.map(([a, b, part], i) =>
+        part === 'core' ? null : (
+          <line
+            key={`behind-${i}`}
+            ref={(el) => {
+              behind.current[i] = el;
+            }}
+            x1={shown[a][0]}
+            y1={shown[a][1]}
+            x2={shown[b][0]}
+            y2={shown[b][1]}
+            stroke="var(--text-3)"
+            strokeWidth={FAR_WIDTH}
+            strokeLinecap="round"
+            opacity={FAR_OPACITY * (1 - prominence(part, shownEmphasis))}
+          />
+        ),
+      )}
+      {BONES.map(([a, b, part], i) => (
         <line
-          key={i}
+          key={`front-${i}`}
           ref={(el) => {
-            lines.current[i] = el;
+            front.current[i] = el;
           }}
           x1={shown[a][0]}
           y1={shown[a][1]}
           x2={shown[b][0]}
           y2={shown[b][1]}
-          stroke={weight === 'far' ? 'var(--text-3)' : 'var(--text-1)'}
-          strokeWidth={weight === 'core' ? 5 : weight === 'near' ? 4.2 : 3.4}
+          stroke="var(--text-1)"
+          strokeWidth={part === 'core' ? 5 : NEAR_WIDTH}
           strokeLinecap="round"
-          opacity={weight === 'far' ? 0.55 : 1}
+          opacity={part === 'core' ? 1 : prominence(part, shownEmphasis)}
         />
       ))}
       <circle

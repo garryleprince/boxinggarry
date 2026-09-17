@@ -73,7 +73,7 @@ export function SessionPreview() {
             </span>
           </div>
           <div style={{ width: 54 }}>
-            <Figure poses={['guard', 'jab']} cycleSec={2.6} size="100%" />
+            <Figure poses={['guard', 'jab']} cycleSec={2.6} cadence="vif" size="100%" />
           </div>
         </div>
         <div className="pill-row">

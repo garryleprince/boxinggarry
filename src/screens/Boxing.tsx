@@ -57,7 +57,7 @@ export function Boxing() {
         <Card>
           <div className="row" style={{ gap: 'var(--s-4)', alignItems: 'flex-start' }}>
             <div style={{ width: 64, flexShrink: 0 }}>
-              <Figure poses={['guard', 'jab', 'guard', 'cross']} size="100%" cycleSec={2.4} />
+              <Figure poses={['guard', 'jab', 'guard', 'cross']} size="100%" cycleSec={2.4} cadence="vif" />
             </div>
             <ul className="stack-sm small" style={{ flex: 1 }}>
               {[

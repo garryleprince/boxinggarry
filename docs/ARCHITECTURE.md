@@ -362,6 +362,13 @@ tantôt le haut d'abord, tantôt le bas. Et la durée d'une répétition est cel
 que l'exercice prescrit (`secondsPerRep`), bornée à une plage regardable : un
 Nordic curl à 6 s se voit lentement, une montée de genoux à 1,4 s vivement.
 
+Enfin, un saut, un étirement et un coup de poing ne sont pas la même phrase.
+Un saut suspend en l'air et se réceptionne en amorti, un étirement est régulier
+et tenu aux deux bouts, un poing part sec et revient s'asseoir dans la garde.
+Chaque famille de mouvement (`PATTERN_CADENCE`) a donc sa propre répartition
+entre position de départ, fin de course basse et fin de course haute — une
+seule cadence pour tout faisait lire les trois comme le même va-et-vient.
+
 ### Interpoler des angles, pas des points
 
 Interpoler les positions des articulations raccourcit les os en cours de route —
@@ -380,13 +387,76 @@ attributs SVG sur une seule boucle `requestAnimationFrame` partagée — pas de
 rendu React soixante fois par seconde, ce qui sur téléphone fait la différence
 entre une démonstration et un à-coup.
 
+### Tenir une position
+
+Douze exercices sur quatre-vingt-dix-neuf ne tiennent qu'une seule position —
+gainages, chaise murale, hollow hold, étirements. Leur figure ne bougeait pas
+d'un pixel, ce qui se lit comme une image cassée plutôt que comme « tiens la
+position ». Un coach qui tient un gainage respire.
+
+La poitrine s'ouvre de quelques dixièmes de degré ; les angles des membres
+étant mesurés contre le tronc, le reste du corps suit tout seul, comme dans la
+réalité. La figure est ensuite redescendue pour que ses appuis restent où ils
+étaient : un souffle soulève le corps, pas le sol. L'amplitude est résolue pose
+par pose pour un même déplacement visible, parce qu'une même rotation du tronc
+déplace les talons d'un chien tête en bas dix fois plus que la garde d'un
+boxeur — le bras de levier n'est pas le même.
+
+Deux pièges, tous deux rencontrés : faire respirer les membres séparément
+fourche la figure en deux (gauche et droite se superposent de profil, et toute
+rotation qui n'est pas identique sur les deux les dédouble) ; et repasser le
+souffle par toute la chaîne de mise au sol le fait franchir un seuil dur de
+détection d'appuis, où un nudge d'une fraction de degré fait basculer la figure
+sur d'autres appuis et la déplace de vingt unités.
+
+### Ce sur quoi le corps s'appuie
+
+Neuf exercices reposent sur quelque chose que le dessin ne montrait pas : un
+mur, une chaise, une barre. La figure semblait suspendue dans le vide ou
+penchée sur rien. La géométrie du support est déduite des articulations de la
+pose elle-même — banc sous les mains, barre à hauteur des mains, mur derrière
+le dos — et prise sur la **première** pose de la séquence, pour qu'elle ne
+bouge pas pendant que le corps bouge : une barre qui suivrait les mains
+détruirait justement ce qu'elle est là pour montrer.
+
+Volontairement absentes : les pompes piquées. Leurs deux poses servent à la
+fois la version au sol et la version pieds surélevés, et dessiner un banc sous
+la version au sol serait un mensonge.
+
+### Quel côté on voit
+
+Les os du côté gauche étaient dessinés en retrait, toujours. Sur un grimpeur,
+une touche d'épaule ou une montée de genoux, le membre qui travaille était donc
+celui qu'on voyait le moins.
+
+Le côté mis en avant se décide maintenant image par image, en fondu — rien ne
+saute. Encore faut-il savoir si le mouvement *alterne* : une pompe, un squat,
+un rowing font travailler les deux côtés en même temps, et chercher un côté
+moteur là où il n'y en a pas fait dériver l'ombrage d'un bord à l'autre pendant
+la répétition, ce qui est pire que de ne rien faire.
+
+La question est tranchée une fois par séquence, en demandant *quand* un membre
+se trouve là où l'autre est maintenant : un cross tombe où le jab est tombé une
+demi-répétition plus tôt, un second genou monte où le premier est monté. Un
+mouvement symétrique ne se ressemble jamais mieux décalé d'une demi-période
+qu'à l'instant présent. La comparaison se fait telle quelle et en miroir, en
+gardant la meilleure des deux, parce que de profil les deux membres se
+superposent et de face ils sont symétriques.
+
+Ce qui ne marche pas, quelle que soit la façon de l'habiller : comparer combien
+chaque membre s'écarte de la moyenne. Les deux mains d'un jab-cross atteignent
+un extrême au même instant — des extrêmes opposés, mais à la même distance.
+
 ### Vérification
 
 `tests/poses.test.ts` mesure ce qui était cassé : os de longueur constante dans
 toute la bibliothèque, côtés gauche et droit identiques, appuis réellement au
 sol, poses dans le cadre, boucle sans rupture, os rigides pendant tout le
 mouvement, temps d'arrêt en fin de course, descente plus lente que la remontée,
-et aucune séquence aplatie par la mise au sol. `npm run figures` écrit une
+aucune séquence aplatie par la mise au sol, isométries qui respirent sans
+décoller leurs appuis, supports dessinés là où il en faut et nulle part
+ailleurs, côté moteur mis en avant sur les mouvements alternés et strictement
+immobile sur les mouvements symétriques. `npm run figures` écrit une
 planche contact SVG pour regarder le résultat — un test ne remplace pas l'œil.
 
 ---

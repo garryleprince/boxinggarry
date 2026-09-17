@@ -78,7 +78,7 @@ export function Shadowboxing() {
             </div>
           </div>
           <div style={{ width: 58 }}>
-            <Figure poses={['guard', 'jab', 'guard', 'cross']} size="100%" cycleSec={2} />
+            <Figure poses={['guard', 'jab', 'guard', 'cross']} size="100%" cycleSec={2} cadence="vif" />
           </div>
         </div>
       </Card>
@@ -248,7 +248,7 @@ function ShadowSession({
           </div>
         ) : (
           <div className="train__figure">
-            <Figure poses={['guard', 'jab', 'guard', 'cross']} size="100%" cycleSec={1.8} />
+            <Figure poses={['guard', 'jab', 'guard', 'cross']} size="100%" cycleSec={1.8} cadence="vif" />
           </div>
         )}
 

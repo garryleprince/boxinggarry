@@ -52,18 +52,27 @@ export const JOINT_ORDER = [
   'footR',
 ] as const;
 
-/** Bones drawn between joints. The far-side limb is rendered de-emphasised. */
-export const BONES: readonly (readonly [Joint, Joint, 'near' | 'far' | 'core'])[] = [
+/**
+ * Bones drawn between joints, back to front.
+ *
+ * Each limb bone carries which limb it belongs to rather than a fixed drawing
+ * weight, because which side should be drawn forward depends on the movement:
+ * the old table left the whole left side greyed out, so on a mountain climber
+ * or a shoulder tap the limb doing the work was the faded one.
+ */
+export type BonePart = 'core' | 'armL' | 'armR' | 'legL' | 'legR';
+
+export const BONES: readonly (readonly [Joint, Joint, BonePart])[] = [
   ['neck', 'hip', 'core'],
-  ['shoulderL', 'elbowL', 'far'],
-  ['elbowL', 'handL', 'far'],
-  ['hip', 'kneeL', 'far'],
-  ['kneeL', 'footL', 'far'],
+  ['shoulderL', 'elbowL', 'armL'],
+  ['elbowL', 'handL', 'armL'],
+  ['hip', 'kneeL', 'legL'],
+  ['kneeL', 'footL', 'legL'],
   ['neck', 'shoulderR', 'core'],
-  ['shoulderR', 'elbowR', 'near'],
-  ['elbowR', 'handR', 'near'],
-  ['hip', 'kneeR', 'near'],
-  ['kneeR', 'footR', 'near'],
+  ['shoulderR', 'elbowR', 'armR'],
+  ['elbowR', 'handR', 'armR'],
+  ['hip', 'kneeR', 'legR'],
+  ['kneeR', 'footR', 'legR'],
   ['neck', 'shoulderL', 'core'],
 ];
 
@@ -371,6 +380,105 @@ function planted(pose: Pose, contacts: readonly Joint[], anchor: Anchor): Pose {
   return out as Pose;
 }
 
+/* ---------------------------------------------------------------- souffle */
+
+/**
+ * Small joint deltas that read as an in-breath, in `SKELETON` order.
+ *
+ * Twelve exercises hold a single position — planks, the wall sit, the hollow
+ * hold, the stretches — so their figure never moved at all, which on screen
+ * reads as a broken image rather than as "hold this". A coach holding a plank
+ * still breathes.
+ *
+ * Only the trunk, the head and the collarbones move. Limb angles are stored
+ * against their parent, so the arms and legs ride the trunk for free, which is
+ * what actually happens. Breathing them separately looked like the figure
+ * coming apart: left and right limbs overlap in a side view, and any rotation
+ * that is not identical on both forks them into two visible limbs.
+ *
+ * This works on an already-placed figure rather than on the drawing, and the
+ * caller holds its supports level afterwards. Sending a breath back through
+ * the whole placement pipeline put it through a hard contact threshold, where
+ * a nudge of a fraction of a degree flipped the figure onto a different set of
+ * supports and moved it twenty units.
+ */
+const BREATH_DELTAS: readonly number[] = [
+  1.4, // trunk: the chest opens, and everything hanging off it follows
+  -1.6, // head lifts a touch
+  -0.7, // clavicles: the shoulders broaden
+  0.7,
+  0, // limbs stay put on purpose — see below
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+].map((deg) => (deg * Math.PI) / 180);
+
+/** The same figure, one breath in. `amount` runs 0 (out) … 1 (in). */
+export function breatheRig(rig: Rig, amount: number): Rig {
+  return {
+    root: rig.root,
+    angles: rig.angles.map((a, i) => a + (BREATH_DELTAS[i] ?? 0) * amount),
+  };
+}
+
+/* ---------------------------------------------------------------- appuis */
+
+/**
+ * What the figure is leaning on, hanging from or sitting against.
+ *
+ * Nine exercises rest on something the drawing never showed — a wall, a chair,
+ * a bar — so the figure appeared to hang in mid-air or lean on nothing. The
+ * geometry is derived from the pose's own joints rather than fixed, so the
+ * support stays under the hands or behind the back as the movement runs.
+ *
+ * Deliberately absent: the pike push-up. Its two poses serve both the floor
+ * version and the feet-elevated one, and drawing a box under the floor version
+ * would be a lie.
+ */
+export type SupportKind = 'benchHands' | 'benchFeet' | 'bar' | 'wall';
+
+export type Segment = readonly [number, number, number, number];
+
+export function supportSegments(kind: SupportKind, pose: Pose): readonly Segment[] {
+  switch (kind) {
+    case 'benchHands':
+    case 'benchFeet': {
+      const hands = kind === 'benchHands';
+      const [a, b] = hands ? [pose.handL, pose.handR] : [pose.footL, pose.footR];
+      const other = hands ? (pose.footL[0] + pose.footR[0]) / 2 : (pose.handL[0] + pose.handR[0]) / 2;
+      const top = Math.max(a[1], b[1]) + 2.4;
+      const left = Math.min(a[0], b[0]) - 8;
+      const right = Math.max(a[0], b[0]) + 8;
+      // Seat, plus one leg on the side the body is not on: a box drawn around
+      // both ends would swallow the legs of a bench dip.
+      const foot = other > (left + right) / 2 ? left : right;
+      return [
+        [left, top, right, top],
+        [foot, top, foot, GROUND + 2],
+      ];
+    }
+    case 'bar': {
+      const y = Math.min(pose.handL[1], pose.handR[1]) - 1.6;
+      const left = Math.min(pose.handL[0], pose.handR[0]) - 11;
+      const right = Math.max(pose.handL[0], pose.handR[0]) + 11;
+      return [
+        [left, y, right, y],
+        [left, y, left, y + 5],
+        [right, y, right, y + 5],
+      ];
+    }
+    case 'wall': {
+      // Behind the back, on the side the trunk leans away from.
+      const x = pose.hip[0] > pose.neck[0] ? Math.max(...JOINT_ORDER.map((j) => pose[j][0])) + 4 : Math.min(...JOINT_ORDER.map((j) => pose[j][0])) - 4;
+      return [[x, GROUND + 2, x, 6]];
+    }
+  }
+}
+
 /** Keep the figure inside the drawing frame without changing its proportions. */
 function framed(pose: Pose, authored: Pose): Pose {
   const cx = JOINT_ORDER.reduce((s, j) => s + pose[j][0], 0) / JOINT_ORDER.length;
@@ -392,7 +500,13 @@ function framed(pose: Pose, authored: Pose): Pose {
 /**
  * Authored drawing → drawable figure: canonical proportions, both sides of the
  * body the same length, and the supporting points actually on the floor.
+ *
+ * `contacts` can be supplied to pin the set rather than read it off this
+ * drawing. Contact detection has a hard threshold, so a pose nudged by a
+ * fraction of a degree can land on a different set and be placed somewhere
+ * else entirely: anything that perturbs a pose and expects a small result —
+ * breathing — must hold the set fixed.
  */
-export function normalise(drawn: Pose, anchor: Anchor): Pose {
-  return framed(planted(toPose(toRig(drawn)), contactsOf(drawn), anchor), drawn);
+export function normalise(drawn: Pose, anchor: Anchor, contacts?: readonly Joint[]): Pose {
+  return framed(planted(toPose(toRig(drawn)), contacts ?? contactsOf(drawn), anchor), drawn);
 }

@@ -5,7 +5,12 @@ import { useTimer } from '@/app/useTimer';
 import { getExercise } from '@/data/exercises';
 import type { PerformedItem, SessionFeedback } from '@/domain/model/workout';
 import { RPE_META, type Rpe } from '@/domain/model/workout';
-import { RECOVERY_REGIONS, REGION_LABELS, type RecoveryRegion } from '@/domain/model/taxonomy';
+import {
+  PATTERN_CADENCE,
+  RECOVERY_REGIONS,
+  REGION_LABELS,
+  type RecoveryRegion,
+} from '@/domain/model/taxonomy';
 import { buildWorkoutPhases, type WorkPhaseMeta } from '@/engines/timer/phases';
 import { formatDuration } from '@/engines/training/duration';
 import { Button, Card, Sheet } from '@/ui/primitives';
@@ -186,7 +191,7 @@ export function Training() {
           <span style={{ width: 36 }} />
         </div>
         <div className="train__body">
-          <Figure poses={['guard', 'jab', 'guard', 'cross']} size={160} />
+          <Figure poses={['guard', 'jab', 'guard', 'cross']} size={160} cadence="vif" />
           <h1 className="train__exercise">{resuming ? 'On reprend' : 'Prêt ?'}</h1>
           <p className="muted small" style={{ textAlign: 'center', maxWidth: 320 }}>
             {resuming ? (
@@ -262,6 +267,7 @@ export function Training() {
               poses={exercise.poses}
               size="100%"
               cycleSec={exercise.secondsPerRep}
+              cadence={PATTERN_CADENCE[exercise.pattern]}
               still={phase?.kind !== 'travail'}
               label={exercise.name}
             />

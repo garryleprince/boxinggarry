@@ -1,3 +1,5 @@
+import type { Cadence } from '@/data/poses';
+
 /**
  * The vocabulary the whole product is built on: muscles, movement patterns,
  * physical qualities, equipment. Every exercise, every block template and every
@@ -97,6 +99,32 @@ export const PATTERNS = [
   'isometric',
 ] as const;
 export type Pattern = (typeof PATTERNS)[number];
+
+/**
+ * How each family of movement should be phrased on screen.
+ *
+ * A jump hangs at the top and lands soft, a stretch is even and held at both
+ * ends, a punch snaps out and sits back in the guard. Showing all three with
+ * one rhythm made them read as the same generic up-and-down.
+ */
+export const PATTERN_CADENCE: Record<Pattern, Cadence> = {
+  'push-horizontal': 'standard',
+  'push-vertical': 'standard',
+  pull: 'standard',
+  squat: 'standard',
+  hinge: 'standard',
+  lunge: 'standard',
+  'core-anti-extension': 'souple',
+  'core-anti-rotation': 'souple',
+  'core-flexion': 'standard',
+  'core-rotation': 'souple',
+  'plyo-lower': 'explosif',
+  'plyo-upper': 'explosif',
+  locomotion: 'vif',
+  shadowbox: 'vif',
+  mobility: 'souple',
+  isometric: 'souple',
+};
 
 export const PATTERN_LABELS: Record<Pattern, string> = {
   'push-horizontal': 'Poussée horizontale',
